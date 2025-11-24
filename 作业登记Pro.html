@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>全科作业登记系统</title>
+    <title>全科作业登记 Pro (震动版)</title>
     <!-- 核心库 -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
@@ -18,6 +18,7 @@
             --accent: #8f94fb;
             --success: #00c853;
             --danger: #ff5252;
+            --warning: #ff9800;
             --bg: #f4f6f9;
             --card-bg: #ffffff;
             --text-main: #2c3e50;
@@ -35,27 +36,13 @@
         /* --- 打印优化 --- */
         #print-area { display: none; }
         @media print {
-            .header-section, .fab-container, .modal-overlay, .main-content, .toast { display: none !important; }
+            .header-section, .fab-container, .modal-overlay, .main-content, .toast, .wechat-tip-overlay { display: none !important; }
             #print-area { display: block; padding: 10px; font-family: sans-serif; }
             .print-title { text-align: center; margin-bottom: 20px; font-size: 24px; }
-            .qr-grid { 
-                display: grid; 
-                grid-template-columns: repeat(3, 1fr); 
-                gap: 15px; 
-            }
-            .qr-card {
-                border: 1px dashed #aaa;
-                padding: 15px 10px;
-                text-align: center;
-                page-break-inside: avoid;
-                border-radius: 8px;
-            }
-            .qr-img-container { margin-bottom: 5px; }
+            .qr-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+            .qr-card { border: 1px dashed #aaa; padding: 15px 10px; text-align: center; page-break-inside: avoid; border-radius: 8px; }
             .qr-img-container img { margin: 0 auto; display: block; }
-            .qr-info { font-size: 14px; font-weight: bold; margin-top: 5px; }
-            .qr-sub { font-size: 10px; color: #666; }
         }
-
 
         /* --- 认证界面 --- */
         .auth-overlay {
@@ -78,9 +65,7 @@
             border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 10px;
         }
         .auth-btn.secondary { background: #f0f0f0; color: #666; margin-top: 10px; }
-        .class-select-group {
-            max-height: 150px; overflow-y: auto; margin-bottom: 15px; border: 1px solid #eee; padding: 10px; border-radius: 8px;
-        }
+        .class-select-group { max-height: 150px; overflow-y: auto; margin-bottom: 15px; border: 1px solid #eee; padding: 10px; border-radius: 8px; }
         .checkbox-item { display: flex; align-items: center; margin-bottom: 8px; font-size: 14px; }
         .checkbox-item input { margin-right: 10px; transform: scale(1.2); }
 
@@ -93,8 +78,8 @@
 
         .nav-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .app-title { font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
-        .user-info { font-size: 12px; background: rgba(0,0,0,0.2); padding: 4px 10px; border-radius: 10px; }
-        .menu-btn { background: rgba(255,255,255,0.2); border: none; color: white; padding: 8px; border-radius: 12px; cursor: pointer; backdrop-filter: blur(5px); }
+        .icon-btn { background: rgba(255,255,255,0.2); border: none; color: white; padding: 8px; border-radius: 12px; cursor: pointer; backdrop-filter: blur(5px); margin-left: 8px; }
+        .notice-dot { position:absolute; top:8px; right:8px; width:8px; height:8px; background:var(--danger); border-radius:50%; border:2px solid var(--accent); }
 
         .subject-tabs {
             display: flex; gap: 10px; overflow-x: auto; padding-bottom: 15px;
@@ -122,93 +107,118 @@
 
         .main-content { padding: 20px 15px 100px; }
         .empty-state { text-align: center; color: var(--text-sub); margin-top: 50px; }
-        .empty-btn { margin-top: 20px; background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 20px; }
+        
+        .student-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+        @media (min-width: 480px) { .student-grid { grid-template-columns: repeat(2, 1fr); } }
 
-        .student-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
         .student-card {
-            background: var(--card-bg); border-radius: 16px; padding: 15px; display: flex; align-items: center; gap: 12px;
-            box-shadow: var(--shadow); transition: transform 0.1s; position: relative; overflow: hidden;
+            background: var(--card-bg); border-radius: 16px; padding: 12px 15px; 
+            display: flex; align-items: center; justify-content: space-between;
+            box-shadow: var(--shadow); transition: transform 0.1s; position: relative;
         }
-        .student-card:active { transform: scale(0.96); }
+        .student-left { display: flex; align-items: center; gap: 12px; flex: 1; overflow: hidden; }
         .student-avatar {
-            width: 40px; height: 40px; border-radius: 50%; background: #f0f2f5; color: var(--text-sub);
-            display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 14px; flex-shrink: 0;
+            width: 42px; height: 42px; border-radius: 50%; background: #f0f2f5; color: var(--text-sub);
+            display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 15px; flex-shrink: 0;
         }
-        .student-info { flex: 1; overflow: hidden; }
-        .student-name { font-weight: 600; font-size: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .student-id { font-size: 12px; color: var(--text-sub); }
+        .student-info { display: flex; flex-direction: column; overflow: hidden; }
+        .student-name { font-weight: 700; font-size: 17px; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .student-id { font-size: 12px; color: var(--text-sub); margin-top: 2px; }
+
+        .action-area { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+        .btn-camera { 
+            background: #f0f2f5; border: none; min-width: 36px; height: 36px; padding: 0 8px; border-radius: 18px; 
+            display: flex; align-items: center; justify-content: center; color: #666; cursor: pointer; font-size:12px; gap:4px;
+        }
+        .btn-camera:active { background: #e0e0e0; }
+        .status-badge {
+            font-size: 12px; padding: 4px 8px; border-radius: 10px; background: #eee; color: #999;
+            display: flex; align-items: center; gap: 4px;
+        }
 
         .student-card.done { border: 1px solid var(--success); background: #fafffc; }
         .student-card.done .student-avatar { background: var(--success); color: white; }
         .student-card.done .student-name { color: #1b5e20; }
-        .check-icon {
-            position: absolute; right: 10px; top: 50%; transform: translateY(-50%) scale(0);
-            color: var(--success); transition: transform 0.2s;
-        }
-        .student-card.done .check-icon { transform: translateY(-50%) scale(1); }
+        .student-card.done .status-badge { background: #e8f5e9; color: var(--success); }
 
-        .fab-container {
-            position: fixed; bottom: calc(20px + var(--safe-bottom)); left: 50%; transform: translateX(-50%);
-            z-index: 90; display: flex; gap: 15px;
-        }
-        .fab-btn {
-            height: 56px; padding: 0 24px; border-radius: 28px; border: none;
-            background: var(--text-main); color: white; font-weight: 600; font-size: 16px;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 8px; cursor: pointer;
-        }
-        .fab-btn.primary { background: var(--primary); }
-
-        /* --- 弹窗与菜单 --- */
+        /* --- 模态框与弹窗 --- */
         .modal-overlay {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4);
-            z-index: 200; backdrop-filter: blur(3px); display: flex; align-items: flex-end; justify-content: center;
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5);
+            z-index: 200; backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center;
         }
         .modal-sheet {
             background: white; width: 100%; border-radius: 24px 24px 0 0; padding: 25px;
-            box-sizing: border-box; animation: slideUp 0.3s ease; max-height: 90vh; overflow-y: auto;
+            box-sizing: border-box; animation: slideUp 0.3s ease; max-height: 90vh; overflow-y: auto; position: fixed; bottom: 0;
         }
         .modal-center {
-            background: white; width: 85%; max-width: 400px; border-radius: 20px; padding: 25px;
-            margin-bottom: auto; margin-top: auto; animation: popIn 0.3s ease;
+            background: white; width: 90%; max-width: 400px; border-radius: 20px; padding: 20px;
+            animation: popIn 0.3s ease; display: flex; flex-direction: column; max-height: 85vh; position: relative;
         }
         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-        @keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes popIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+        /* 公告板 */
+        .notice-textarea { 
+            width: 100%; height: 120px; border: 1px solid #ddd; border-radius: 10px; padding: 10px; 
+            font-family: inherit; font-size: 15px; margin: 10px 0; resize: none; box-sizing: border-box;
+        }
+
+        /* 相机 UI */
+        .camera-full-overlay {
+            position: fixed; inset: 0; background: black; z-index: 500; display: flex; flex-direction: column;
+        }
+        .camera-header {
+            padding: 15px; color: white; display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3);
+            position: absolute; top:0; left:0; right:0; z-index: 10;
+        }
+        .camera-view-container { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        video#camera-feed { width: 100%; height: 100%; object-fit: cover; }
         
+        .camera-footer {
+            background: rgba(0,0,0,0.8); padding: 20px; display: flex; flex-direction: column; align-items: center; gap: 15px;
+            padding-bottom: calc(20px + var(--safe-bottom));
+        }
+        .thumb-strip {
+            display: flex; gap: 10px; overflow-x: auto; width: 100%; padding-bottom: 5px; min-height: 60px;
+        }
+        .thumb-item {
+            width: 50px; height: 50px; border-radius: 8px; border: 2px solid white; object-fit: cover; flex-shrink: 0;
+        }
+        .shutter-row { display: flex; align-items: center; justify-content: center; width: 100%; gap: 30px; }
+        .shutter-btn { 
+            width: 70px; height: 70px; border-radius: 50%; background: white; border: 4px solid #ccc; 
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+        }
+        .shutter-btn:active { transform: scale(0.95); background: #eee; }
+        .shutter-inner { width: 60px; height: 60px; border-radius: 50%; background: var(--primary); }
+        
+        .btn-system-cam {
+            background: rgba(255,255,255,0.2); color: white; padding: 8px 15px; border-radius: 20px; font-size: 12px;
+            border: 1px solid rgba(255,255,255,0.5); display: flex; align-items: center; gap: 5px;
+        }
+
+        /* 预览网格 */
+        .preview-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 15px 0; max-height: 60vh; overflow-y: auto; }
+        .preview-item { position: relative; padding-top: 100%; }
+        .preview-img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
+        .preview-del {
+            position: absolute; top: -5px; right: -5px; background: var(--danger); color: white; border-radius: 50%;
+            width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 14px;
+        }
+
         .menu-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
-        .menu-item {
-            display: flex; flex-direction: column; align-items: center; gap: 8px;
-            padding: 15px; background: #f8f9fa; border-radius: 12px; color: var(--text-main); font-size: 13px;
-        }
-        .menu-item:active { background: #e2e6ea; }
-        .menu-icon { font-size: 26px; color: var(--primary); }
-
-        .class-manage-list { margin: 15px 0; max-height: 300px; overflow-y: auto; }
-        .class-manage-item {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 12px; border-bottom: 1px solid #eee;
-        }
-        .btn-delete { color: var(--danger); background: none; border: none; padding: 8px; }
+        .menu-item { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 15px; background: #f8f9fa; border-radius: 12px; font-size: 13px; }
         
-        .sync-actions { display: flex; gap: 10px; margin-top: 15px; }
-        .btn-full { flex: 1; padding: 12px; border-radius: 10px; border: none; font-weight: 600; cursor: pointer; }
-        .btn-blue { background: #e3f2fd; color: #1976d2; }
-        .btn-purple { background: #f3e5f5; color: #7b1fa2; }
-        .btn-logout { width: 100%; padding: 15px; background: #ffebee; color: var(--danger); border: none; margin-top: 15px; font-weight: 600; border-radius: 12px; }
+        .fab-container { position: fixed; bottom: calc(20px + var(--safe-bottom)); left: 50%; transform: translateX(-50%); z-index: 90; }
+        .fab-btn {
+            height: 56px; padding: 0 24px; border-radius: 28px; border: none; background: var(--text-main); color: white;
+            font-weight: 600; font-size: 16px; box-shadow: 0 8px 20px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 8px;
+        }
 
-        .scanner-overlay { position: fixed; inset: 0; background: black; z-index: 300; }
-        .scan-frame {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 70%; height: 300px; border: 2px solid rgba(255,255,255,0.6); border-radius: 20px;
-        }
-        .scan-frame::after {
-            content:''; position: absolute; top: 10%; left: 5%; right: 5%; height: 2px;
-            background: #00c853; box-shadow: 0 0 10px #00c853; animation: scan 2s infinite;
-        }
-        @keyframes scan { 0% {top:10%; opacity:0} 50% {opacity:1} 100% {top:90%; opacity:0} }
-        .scan-close {
-            position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%);
-            padding: 10px 30px; border-radius: 30px; border: 1px solid white; background: rgba(0,0,0,0.5); color: white;
-        }
+        .btn-full { width: 100%; padding: 12px; border-radius: 10px; border: none; font-weight: 600; margin-top: 10px; cursor: pointer; }
+        .btn-blue { background: var(--primary); color: white; }
+        .btn-green { background: var(--success); color: white; }
+        .btn-red { background: #ffebee; color: var(--danger); }
 
         .toast {
             position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-100px);
@@ -218,25 +228,21 @@
         .toast.show { transform: translateX(-50%) translateY(0); }
         .toast.success { background: #00c853; }
         .toast.error { background: #d32f2f; }
-
-        /* 微信提示层 */
-        .wechat-tip-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9); z-index: 5000; color: white;
-            text-align: right; padding: 20px 30px;
-        }
+        
+        .wechat-tip-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 5000; color: white; text-align: right; padding: 20px 30px; }
     </style>
 </head>
 <body :class="{'print-mode': printing}">
     <div id="app">
+        <!-- 系统相机兜底 Input -->
+        <input type="file" id="system-camera-input" accept="image/*" capture="environment" style="display:none" @change="handleSystemCamera" />
         <input type="file" id="file-upload" accept=".xlsx, .xls" @change="handleFileUpload" style="display:none" />
         
-        <!-- 微信内导出提示 -->
+        <!-- 微信导出提示 -->
         <div v-if="showWeChatTip" class="wechat-tip-overlay" @click="showWeChatTip=false">
             <span class="material-icons-round" style="font-size:48px; display:block; margin-bottom:10px;">arrow_upward</span>
             <div style="font-size:18px; font-weight:bold;">请点击右上角菜单</div>
-            <div style="font-size:16px;">选择“在浏览器打开”以导出文件</div>
-            <div style="margin-top:20px; font-size:14px; opacity:0.7;">(点击任意处关闭)</div>
+            <div>选择“在浏览器打开”以导出文件</div>
         </div>
 
         <!-- 认证界面 -->
@@ -245,28 +251,19 @@
                 <div class="auth-title">{{ isRegistering ? '注册新教师' : '教师登录' }}</div>
                 <input class="auth-input" v-model="authForm.username" placeholder="请输入用户名" />
                 <input class="auth-input" v-model="authForm.password" type="password" placeholder="请输入密码" />
-                
                 <div v-if="isRegistering">
-                    <div style="font-size:14px; margin-bottom:5px; color:#666;">请选择您任教的班级:</div>
+                    <div style="font-size:14px; margin-bottom:5px; color:#666;">请选择任教班级 (可多选):</div>
                     <div class="class-select-group">
-                        <div v-if="allClassList.length === 0" style="color:#999; font-size:12px; text-align:center;">
-                            系统暂无班级数据<br>请先登录已有账号导入名单<br>或直接注册后在后台导入
-                        </div>
+                        <div v-if="allClassList.length === 0" style="color:#999; font-size:12px; text-align:center;">暂无班级数据</div>
                         <div v-for="cls in allClassList" :key="cls" class="checkbox-item">
                             <input type="checkbox" :id="'chk-'+cls" :value="cls" v-model="authForm.selectedClasses">
                             <label :for="'chk-'+cls">{{ cls }}班</label>
                         </div>
                     </div>
                 </div>
-
-                <button class="auth-btn" @click="handleAuth" :disabled="authLoading">
-                    {{ authLoading ? '处理中...' : (isRegistering ? '立即注册' : '登录') }}
-                </button>
-                <button class="auth-btn secondary" @click="toggleAuthMode" :disabled="authLoading">
-                    {{ isRegistering ? '已有账号？去登录' : '没有账号？去注册' }}
-                </button>
+                <button class="auth-btn" @click="handleAuth" :disabled="authLoading">{{ authLoading ? '处理中...' : (isRegistering ? '注册' : '登录') }}</button>
+                <button class="auth-btn secondary" @click="toggleAuthMode">{{ isRegistering ? '去登录' : '去注册' }}</button>
             </div>
-            <div style="margin-top:20px; font-size:12px; opacity:0.8;">作业登记系统 Pro</div>
         </div>
 
         <!-- 主界面 -->
@@ -277,9 +274,13 @@
                         <span class="material-icons-round">folder_shared</span>
                         全科作业登记
                     </div>
-                    <div style="display:flex; align-items:center; gap:10px;">
-                        <span class="user-info">{{ currentUser.username }}</span>
-                        <button class="menu-btn" @click="showMenu = true">
+                    <div style="display:flex; align-items:center;">
+                        <span style="font-size:12px; opacity:0.8; margin-right:5px;">{{ currentUser.username }}</span>
+                        <button class="icon-btn" @click="openNoticeModal" style="position:relative;">
+                            <span class="material-icons-round">campaign</span>
+                            <span v-if="currentNotice" class="notice-dot"></span>
+                        </button>
+                        <button class="icon-btn" @click="showMenu = true">
                             <span class="material-icons-round">tune</span>
                         </button>
                     </div>
@@ -298,44 +299,54 @@
 
                 <div class="info-bar">
                     <div class="class-selector">
-                        <div v-if="allowedClassList.length === 0" style="padding:5px; font-size:12px; color:rgba(255,255,255,0.7);">
-                            无负责班级
-                        </div>
+                        <div v-if="allowedClassList.length === 0" style="padding:5px; font-size:12px; color:rgba(255,255,255,0.7);">请在菜单添加班级</div>
                         <div v-for="cls in allowedClassList" :key="cls" class="class-btn" 
                             :class="{active: currentClass === cls}" @click="currentClass = cls">
                             {{ cls }}班
                         </div>
                     </div>
-                    <div class="progress-text">
-                        {{ currentSubject }}：{{ submittedCount }}/{{ currentList.length }}
-                    </div>
+                    <div class="progress-text">{{ submittedCount }}/{{ currentList.length }}</div>
                 </div>
             </header>
 
             <main class="main-content">
                 <div v-if="currentList.length === 0" class="empty-state">
                     <span class="material-icons-round" style="font-size: 48px; opacity: 0.3;">group_off</span>
-                    <p>当前班级无名单或您未选择班级</p>
-                    <button class="empty-btn" @click="showMenu = true">菜单设置</button>
+                    <p>暂无学生名单</p>
+                    <button class="btn-blue btn-full" style="width:auto; padding:8px 20px;" @click="showClassManager = true">添加学生/班级</button>
                 </div>
 
                 <div class="student-grid" v-else>
-                    <div v-for="s in currentList" :key="s.uid" class="student-card" 
-                        :class="{done: s.submitted}" @click="toggleStatus(s)">
-                        <div class="student-avatar">{{ s.no }}</div>
-                        <div class="student-info">
-                            <div class="student-name">{{ s.name }}</div>
-                            <div class="student-id">{{ s.classId }}班 {{ s.no }}号</div>
+                    <div v-for="s in currentList" :key="s.uid" class="student-card" :class="{done: s.submitted}">
+                        <!-- 左侧：点击切换状态 -->
+                        <div class="student-left" @click="toggleStatus(s)">
+                            <div class="student-avatar">{{ s.no }}</div>
+                            <div class="student-info">
+                                <div class="student-name">{{ s.name }}</div>
+                                <div class="student-id">{{ s.classId }}班 {{ s.no }}号</div>
+                            </div>
                         </div>
-                        <span class="material-icons-round check-icon">check_circle</span>
+
+                        <!-- 右侧：操作区 -->
+                        <div class="action-area">
+                            <div v-if="s.imgCount > 0" class="btn-camera" style="color:var(--primary); background:#e3f2fd;" @click.stop="viewImages(s)">
+                                <span class="material-icons-round">photo_library</span> {{ s.imgCount }}
+                            </div>
+                            <button v-else class="btn-camera" @click.stop="openCamera(s)">
+                                <span class="material-icons-round">photo_camera</span>
+                            </button>
+                            <div class="status-badge">
+                                <span class="material-icons-round" style="font-size:14px;">{{ s.submitted ? 'check_circle' : 'pending' }}</span>
+                                {{ s.submitted ? '已交' : '未交' }}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </main>
 
             <div class="fab-container">
-                <button class="fab-btn primary" @click="startScan">
-                    <span class="material-icons-round">qr_code_scanner</span>
-                    扫码登记
+                <button class="fab-btn" style="background:var(--primary);" @click="startScan">
+                    <span class="material-icons-round">qr_code_scanner</span> 扫码登记
                 </button>
             </div>
         </template>
@@ -346,76 +357,153 @@
                 <div style="font-size:18px; font-weight:700; margin-bottom:20px;">系统菜单</div>
                 <div class="menu-grid">
                     <div class="menu-item" @click="triggerFileUpload">
-                        <span class="material-icons-round menu-icon">upload_file</span><span>导入名单</span>
+                        <span class="material-icons-round" style="color:#4caf50; font-size:24px;">upload_file</span><span>Excel导入</span>
                     </div>
                     <div class="menu-item" @click="showClassManager = true; showMenu = false;">
-                        <span class="material-icons-round menu-icon" style="color:#607d8b">manage_accounts</span><span>班级管理</span>
+                        <span class="material-icons-round" style="color:#607d8b; font-size:24px;">manage_accounts</span><span>班级管理</span>
                     </div>
                     <div class="menu-item" @click="exportExcel">
-                        <span class="material-icons-round menu-icon">file_download</span><span>导出统计</span>
+                        <span class="material-icons-round" style="color:#2196f3; font-size:24px;">file_download</span><span>导出统计</span>
                     </div>
                     <div class="menu-item" @click="preparePrint">
-                        <span class="material-icons-round menu-icon">print</span><span>打印二维码</span>
+                        <span class="material-icons-round" style="color:#333; font-size:24px;">print</span><span>打印二维码</span>
                     </div>
                     <div class="menu-item" @click="resetCurrentSubject">
-                        <span class="material-icons-round menu-icon" style="color:orange">restart_alt</span><span>重置{{currentSubject}}</span>
+                        <span class="material-icons-round" style="color:orange; font-size:24px;">restart_alt</span><span>重置本科目</span>
                     </div>
                     <div class="menu-item" @click="showUserSetting = true; showMenu = false;">
-                        <span class="material-icons-round menu-icon" style="color:#7b1fa2">perm_identity</span><span>账户设置</span>
+                        <span class="material-icons-round" style="color:#7b1fa2; font-size:24px;">perm_identity</span><span>账户设置</span>
                     </div>
                 </div>
-
-                <div style="border-top:1px solid #eee; padding-top:20px;">
-                    <div style="font-weight:600;">云端数据同步</div>
-                    <div class="sync-actions">
-                        <button class="btn-full btn-blue" @click="uploadData" :disabled="loading">
-                            {{ loading ? '同步中...' : '上传数据' }}
-                        </button>
-                        <button class="btn-full btn-purple" @click="downloadData" :disabled="loading">
-                            {{ loading ? '同步中...' : '下载数据' }}
-                        </button>
+                <div style="border-top:1px solid #eee; padding-top:15px;">
+                    <div style="display:flex; gap:10px;">
+                        <button class="btn-full" style="background:#e3f2fd; color:#1565c0; margin:0;" @click="uploadData" :disabled="loading">{{ loading?'...':'同步上传' }}</button>
+                        <button class="btn-full" style="background:#f3e5f5; color:#6a1b9a; margin:0;" @click="downloadData" :disabled="loading">{{ loading?'...':'同步下载' }}</button>
                     </div>
-                    <button class="btn-logout" @click="logout">退出登录</button>
+                    <button class="btn-full btn-red" @click="logout" style="margin-top:15px;">退出登录</button>
                 </div>
-                <button style="width:100%; padding:15px; border:none; background:white; color:#666;" @click="showMenu = false">关闭</button>
             </div>
+        </div>
+
+        <!-- 1. 公告弹窗 -->
+        <div class="modal-overlay" v-if="showNoticeModal" @click.self="showNoticeModal = false">
+            <div class="modal-center">
+                <div style="font-size:18px; font-weight:700;">📢 {{currentSubject}}作业要求</div>
+                <textarea class="notice-textarea" v-model="tempNoticeText" placeholder="在此输入今日作业内容..."></textarea>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn-full btn-red" v-if="tempNoticeText" @click="clearNotice">清空</button>
+                    <button class="btn-full btn-blue" @click="saveNotice">保存</button>
+                </div>
+                <button style="margin-top:10px; background:none; border:none; color:#666;" @click="showNoticeModal = false">关闭</button>
+            </div>
+        </div>
+
+        <!-- 2. 全屏相机界面 -->
+        <div class="camera-full-overlay" v-if="cameraActive">
+            <canvas id="photo-canvas" style="display:none;"></canvas>
+            <div class="camera-header">
+                <span style="font-weight:600;">{{currentPhotoStudent?.name}} ({{tempImages.length}}/10)</span>
+                <span class="material-icons-round" @click="closeCamera">close</span>
+            </div>
+            
+            <div class="camera-view-container">
+                <video id="camera-feed" autoplay playsinline webkit-playsinline></video>
+                <div v-if="cameraError" style="position:absolute; color:white; text-align:center; padding:20px;">
+                    <span class="material-icons-round" style="font-size:48px; opacity:0.5;">videocam_off</span>
+                    <p>网页相机启动失败</p>
+                    <p style="font-size:12px; opacity:0.8;">请使用下方"系统相机"按钮</p>
+                </div>
+            </div>
+
+            <div class="camera-footer">
+                <div class="thumb-strip" v-if="tempImages.length > 0">
+                    <img v-for="(img, idx) in tempImages" :key="idx" :src="img" class="thumb-item" />
+                </div>
+                <div class="shutter-row">
+                    <button class="btn-system-cam" @click="triggerSystemCamera">
+                        <span class="material-icons-round">photo_camera_back</span> 系统相机
+                    </button>
+                    <div class="shutter-btn" @click="takePhoto" :style="{opacity: cameraError?0.5:1}">
+                        <div class="shutter-inner"></div>
+                    </div>
+                    <button class="btn-system-cam" style="background:#00c853; border-color:#00c853;" @click="saveAndCloseCamera">
+                        <span class="material-icons-round">check</span> 完成
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. 多图预览/管理 弹窗 -->
+        <div class="modal-overlay" v-if="previewImageModal" @click.self="previewImageModal = false">
+            <div class="modal-center" style="max-height:80vh;">
+                <div style="font-size:18px; font-weight:700;">{{currentPhotoStudent?.name}} 的作业</div>
+                <div style="font-size:12px; color:#666; margin-bottom:10px;">共 {{tempImages.length}} 张照片</div>
+                <div class="preview-grid">
+                    <div v-for="(img, idx) in tempImages" :key="idx" class="preview-item">
+                        <img :src="img" class="preview-img" @click="viewSingleBig(img)">
+                        <div class="preview-del" @click="deleteImage(idx)">×</div>
+                    </div>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn-full btn-blue" @click="openCamera(currentPhotoStudent); previewImageModal=false;">继续拍照</button>
+                    <button class="btn-full btn-red" @click="deleteAllImages">清空重拍</button>
+                </div>
+                <button style="margin-top:15px; width:100%; border:none; background:white; color:#666;" @click="previewImageModal = false">关闭</button>
+            </div>
+        </div>
+        
+        <!-- 4. 单张大图预览 -->
+        <div v-if="singleBigImg" style="position:fixed; inset:0; z-index:2000; background:black; display:flex; align-items:center; justify-content:center;" @click="singleBigImg=null">
+            <img :src="singleBigImg" style="max-width:100%; max-height:100%;">
         </div>
 
         <!-- 班级管理 -->
         <div class="modal-overlay" v-if="showClassManager" @click.self="showClassManager = false">
             <div class="modal-center">
-                <div style="font-size:18px; font-weight:700;">班级名单管理</div>
-                <div class="class-manage-list">
-                    <div v-if="allClassList.length === 0" style="text-align:center; padding:20px; color:#999;">暂无数据</div>
-                    <div v-else v-for="cls in allClassList" :key="'m-'+cls" class="class-manage-item">
-                        <span style="font-weight:600;">{{ cls }}班</span>
-                        <button class="btn-delete" @click="deleteClass(cls)"><span class="material-icons-round">delete</span></button>
+                <div style="font-size:18px; font-weight:700; margin-bottom:15px;">班级名单管理</div>
+                <div style="background:#f8f9fa; padding:15px; border-radius:10px; margin-bottom:15px;">
+                    <div style="font-weight:600; margin-bottom:10px; font-size:14px;">➕ 手动添加学生</div>
+                    <div style="display:grid; grid-template-columns: 80px 80px 1fr; gap:8px;">
+                        <input v-model="newStudent.classId" placeholder="班级" style="padding:8px; border:1px solid #ddd; border-radius:6px;">
+                        <input v-model="newStudent.no" placeholder="学号" style="padding:8px; border:1px solid #ddd; border-radius:6px;">
+                        <input v-model="newStudent.name" placeholder="姓名" style="padding:8px; border:1px solid #ddd; border-radius:6px;">
+                    </div>
+                    <button class="btn-full btn-blue" style="padding:8px; margin-top:8px; font-size:13px;" @click="addManualStudent">确认添加</button>
+                </div>
+                <div style="max-height:200px; overflow-y:auto;">
+                    <div v-for="cls in allClassList" :key="'m-'+cls" style="display:flex; justify-content:space-between; padding:10px; border-bottom:1px solid #eee;">
+                        <span>{{ cls }}班</span>
+                        <span style="color:var(--danger); cursor:pointer;" @click="deleteClass(cls)">删除整班</span>
                     </div>
                 </div>
-                <button style="width:100%; padding:15px; background:none; border:none; color:#666;" @click="showClassManager = false">关闭</button>
+                <button style="width:100%; padding:15px; border:none; background:none; color:#666;" @click="showClassManager = false">关闭</button>
             </div>
         </div>
 
-        <!-- 用户班级设置 -->
+        <!-- 账户设置 -->
         <div class="modal-overlay" v-if="showUserSetting" @click.self="showUserSetting = false">
             <div class="modal-center">
-                <div style="font-size:18px; font-weight:700; margin-bottom:15px;">设置我的班级</div>
-                <div class="class-select-group" style="max-height:300px;">
+                <div style="font-size:18px; font-weight:700; margin-bottom:15px;">我的班级设置</div>
+                <div class="class-select-group">
                     <div v-for="cls in allClassList" :key="'set-'+cls" class="checkbox-item">
                         <input type="checkbox" :id="'set-chk-'+cls" :value="cls" v-model="currentUser.classes">
                         <label :for="'set-chk-'+cls">{{ cls }}班</label>
                     </div>
                 </div>
-                <button class="btn-full btn-blue" @click="updateUserClasses">保存修改</button>
-                <button style="width:100%; padding:15px; background:none; border:none; color:#666;" @click="showUserSetting = false">取消</button>
+                <button class="btn-full btn-blue" @click="updateUserClasses">保存</button>
             </div>
         </div>
 
-        <!-- 扫描 & Toast -->
-        <div v-if="scanning" class="scanner-overlay"><div id="reader" style="width:100%;height:100%"></div><div class="scan-frame"></div><button class="scan-close" @click="stopScan">关闭</button></div>
-        <div class="toast" :class="{show: toast.show, success: toast.type === 'success', error: toast.type === 'error'}"><span class="material-icons-round">{{ toast.type === 'success'?'check_circle':'info' }}</span><span>{{ toast.msg }}</span></div>
+        <!-- 扫描 & Toast & 打印 -->
+        <div v-if="scanning" style="position:fixed;inset:0;background:black;z-index:300;">
+            <div id="reader" style="width:100%;height:100%"></div>
+            <button style="position:absolute;bottom:50px;left:50%;transform:translate(-50%);padding:10px 30px;border-radius:30px;background:rgba(255,255,255,0.3);border:1px solid white;color:white;" @click="stopScan">关闭扫码</button>
+        </div>
         
-        <!-- 打印区域 (核心修复点) -->
+        <div class="toast" :class="{show: toast.show, success: toast.type === 'success', error: toast.type === 'error'}">
+            <span class="material-icons-round">{{ toast.type === 'success'?'check_circle':'info' }}</span><span>{{ toast.msg }}</span>
+        </div>
+        
         <div id="print-area">
             <div style="text-align:center;font-size:24px;margin-bottom:20px; font-weight:bold;">{{currentClass}}班 学生二维码</div>
             <div class="qr-grid">
@@ -426,12 +514,10 @@
                 </div>
             </div>
         </div>
-
     </div>
 
     <script>
-        const { createApp, ref, computed, onMounted, nextTick, watch } = Vue;
-
+        const { createApp, ref, computed, nextTick, onMounted } = Vue;
         const CONFIG = { binId: '6923c68543b1c97be9c111de', apiKey: '$2a$10$PzeIEyOc63K1OPPrCb1Y.uzvCUXWUEfsYmu.7gkaCMTsjJ3FLWM3u' };
 
         createApp({
@@ -440,29 +526,38 @@
                 const currentSubject = ref('语文');
                 const currentClass = ref('');
                 
-                // 数据
-                const roster = ref([]); 
-                const records = ref({}); 
-                const users = ref([]); 
-                
-                // 状态
+                const roster = ref([]);
+                const records = ref({});
+                const users = ref([]);
+                const notices = ref({});
+
                 const isLoggedIn = ref(false);
                 const currentUser = ref(null);
                 const isRegistering = ref(false);
-                const authLoading = ref(false);
                 const authForm = ref({ username: '', password: '', selectedClasses: [] });
+                const authLoading = ref(false);
                 
                 const showMenu = ref(false);
                 const showClassManager = ref(false);
                 const showUserSetting = ref(false);
                 const showWeChatTip = ref(false);
+                const showNoticeModal = ref(false);
+                const tempNoticeText = ref('');
+                
+                const cameraActive = ref(false);
+                const cameraError = ref(false);
+                const currentPhotoStudent = ref(null);
+                const tempImages = ref([]);
+                const previewImageModal = ref(false);
+                const singleBigImg = ref(null);
+                let videoStream = null;
+
                 const scanning = ref(false);
-                const printing = ref(false); // 打印状态
+                const printing = ref(false);
                 const loading = ref(false);
                 const toast = ref({ show: false, msg: '', type: 'info' });
+                const newStudent = ref({ classId:'', no:'', name:'' });
                 let html5QrcodeScanner = null;
-
-                const initRecords = () => subjects.forEach(sub => { if (!records.value[sub]) records.value[sub] = {}; });
 
                 const allClassList = computed(() => [...new Set(roster.value.map(s => s.classId))].sort());
                 const allowedClassList = computed(() => {
@@ -473,17 +568,127 @@
                     if (!currentClass.value) return [];
                     if (!allowedClassList.value.includes(currentClass.value)) return [];
                     const list = roster.value.filter(s => s.classId == currentClass.value);
-                    return list.map(s => ({
-                        ...s,
-                        submitted: !!(records.value[currentSubject.value] && records.value[currentSubject.value][s.uid])
-                    }));
+                    const subRecords = records.value[currentSubject.value] || {};
+                    return list.map(s => {
+                        const rec = subRecords[s.uid];
+                        let isDone = false, count = 0;
+                        if(rec) {
+                            if(rec === true) isDone = true;
+                            else {
+                                isDone = rec.submitted;
+                                if(rec.imgs && Array.isArray(rec.imgs)) count = rec.imgs.length;
+                                else if(rec.img) count = 1;
+                            }
+                        }
+                        return { ...s, submitted: isDone, imgCount: count };
+                    });
                 });
-
                 const submittedCount = computed(() => currentList.value.filter(s => s.submitted).length);
                 const percentage = computed(() => currentList.value.length === 0 ? 0 : Math.round((submittedCount.value / currentList.value.length) * 100));
+                const currentNotice = computed(() => (notices.value[currentClass.value] && notices.value[currentClass.value][currentSubject.value]) || '');
 
-                // 认证逻辑
-                const toggleAuthMode = () => { isRegistering.value = !isRegistering.value; authForm.value.selectedClasses = []; };
+                const initStructure = () => {
+                    subjects.forEach(sub => { if (!records.value[sub]) records.value[sub] = {}; });
+                    if(!notices.value) notices.value = {};
+                };
+                const showToast = (msg, type='info') => { toast.value = { show: true, msg, type }; setTimeout(() => toast.value.show = false, 2000); };
+                const getRec = (uid) => {
+                    let r = records.value[currentSubject.value][uid];
+                    if(!r) return { submitted:false, imgs:[] };
+                    if(r === true) return { submitted:true, imgs:[] };
+                    if(r.img && (!r.imgs || r.imgs.length===0)) r.imgs = [r.img];
+                    if(!r.imgs) r.imgs = [];
+                    return r;
+                };
+                const setRec = (uid, data) => { records.value[currentSubject.value][uid] = data; };
+
+                const toggleStatus = (s) => {
+                    const rec = getRec(s.uid);
+                    if (rec.submitted) {
+                        if(rec.imgs.length > 0 && confirm("该学生有照片，取消将不删除照片仅标记为未交？")) setRec(s.uid, { ...rec, submitted: false });
+                        else if(rec.imgs.length === 0) delete records.value[currentSubject.value][s.uid];
+                    } else {
+                        setRec(s.uid, { ...rec, submitted: true, ts: Date.now() });
+                        if(navigator.vibrate) navigator.vibrate(50);
+                    }
+                };
+
+                const openNoticeModal = () => { tempNoticeText.value = currentNotice.value; showNoticeModal.value = true; };
+                const saveNotice = () => {
+                    if(!notices.value[currentClass.value]) notices.value[currentClass.value] = {};
+                    notices.value[currentClass.value][currentSubject.value] = tempNoticeText.value;
+                    showToast("公告更新", "success"); showNoticeModal.value = false;
+                };
+                const clearNotice = () => { tempNoticeText.value = ''; saveNotice(); };
+
+                const openCamera = async (s) => {
+                    currentPhotoStudent.value = s; const rec = getRec(s.uid); tempImages.value = rec.imgs ? [...rec.imgs] : [];
+                    cameraActive.value = true; cameraError.value = false;
+                    nextTick(async () => {
+                        try {
+                            const video = document.getElementById('camera-feed');
+                            videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                            video.srcObject = videoStream; video.onloadedmetadata = () => { video.play(); };
+                        } catch(e) { cameraError.value = true; }
+                    });
+                };
+                const closeCamera = () => { if(videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; } cameraActive.value = false; currentPhotoStudent.value = null; };
+                const triggerSystemCamera = () => { document.getElementById('system-camera-input').click(); };
+                const handleSystemCamera = (e) => {
+                    const file = e.target.files[0]; if(!file) return;
+                    if(tempImages.value.length >= 10) return showToast("最多10张", "error");
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            const canvas = document.createElement('canvas'); const maxDim = 800; let w = img.width, h = img.height;
+                            if(w>h && w>maxDim){ h*=maxDim/w; w=maxDim; } else if(h>maxDim){ w*=maxDim/h; h=maxDim; }
+                            canvas.width = w; canvas.height = h; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, w, h);
+                            tempImages.value.push(canvas.toDataURL('image/jpeg', 0.6));
+                        };
+                        img.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file); e.target.value = '';
+                };
+                const takePhoto = () => {
+                    if(cameraError.value) return showToast("请使用系统相机按钮", "error");
+                    if(tempImages.value.length >= 10) return showToast("最多10张", "error");
+                    const video = document.getElementById('camera-feed'); const canvas = document.getElementById('photo-canvas');
+                    if(!video || !canvas) return;
+                    const maxDim = 800; let w = video.videoWidth, h = video.videoHeight;
+                    if(w>h && w>maxDim){ h*=maxDim/w; w=maxDim; } else if(h>maxDim){ w*=maxDim/h; h=maxDim; }
+                    canvas.width = w; canvas.height = h; const ctx = canvas.getContext('2d'); ctx.drawImage(video, 0, 0, w, h);
+                    tempImages.value.push(canvas.toDataURL('image/jpeg', 0.6));
+                    if(navigator.vibrate) navigator.vibrate(50);
+                };
+                const saveAndCloseCamera = () => { if(currentPhotoStudent.value) { setRec(currentPhotoStudent.value.uid, { submitted: true, imgs: tempImages.value, ts: Date.now() }); showToast("保存成功", "success"); } closeCamera(); };
+                const viewImages = (s) => { currentPhotoStudent.value = s; const rec = getRec(s.uid); tempImages.value = rec.imgs ? [...rec.imgs] : []; previewImageModal.value = true; };
+                const viewSingleBig = (img) => { singleBigImg.value = img; };
+                const deleteImage = (idx) => { if(confirm("删除这张?")) { tempImages.value.splice(idx, 1); const s = currentPhotoStudent.value; setRec(s.uid, { submitted: true, imgs: tempImages.value, ts: Date.now() }); if(tempImages.value.length === 0) previewImageModal.value = false; } };
+                const deleteAllImages = () => { if(confirm("清空该学生所有照片?")) { tempImages.value = []; setRec(currentPhotoStudent.value.uid, { submitted: true, imgs: [], ts: Date.now() }); previewImageModal.value = false; } };
+
+                const addManualStudent = () => {
+                    const { classId, no, name } = newStudent.value; if(!classId || !no || !name) return showToast("请填写完整", "error");
+                    const newUid = `${String(classId).trim()}-${String(no).trim().padStart(2,'0')}`;
+                    if(roster.value.some(s => s.uid === newUid)) return showToast("已存在", "error");
+                    roster.value.push({ classId: String(classId).trim(), no: String(no).trim().padStart(2,'0'), name: name.trim(), uid: newUid });
+                    if(!currentUser.value.classes.includes(classId)) { currentUser.value.classes.push(classId); users.value = users.value.map(u => u.username === currentUser.value.username ? currentUser.value : u); }
+                    newStudent.value = { classId:'', no:'', name:'' }; showToast("添加成功", "success"); if(!currentClass.value) currentClass.value = classId;
+                };
+
+                const fetchCloudData = async (silent = false) => {
+                    if(!silent) loading.value = true;
+                    try {
+                        const res = await fetch(`https://api.jsonbin.io/v3/b/${CONFIG.binId}/latest`, { headers: { 'X-Master-Key': CONFIG.apiKey } });
+                        if(!res.ok) throw new Error("网络");
+                        const json = await res.json(); const data = json.record || {};
+                        if(data.roster) roster.value = data.roster; if(data.records) records.value = data.records;
+                        if(data.users) users.value = data.users; if(data.notices) notices.value = data.notices;
+                        initStructure();
+                        if (isLoggedIn.value) { const updatedUser = users.value.find(u => u.username === currentUser.value.username); if (updatedUser) currentUser.value = updatedUser; }
+                    } catch(e) { if(!silent) showToast("同步失败", "error"); } finally { if(!silent) loading.value = false; }
+                };
+                const saveToCloud = async () => { loading.value = true; try { await fetch(`https://api.jsonbin.io/v3/b/${CONFIG.binId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Master-Key': CONFIG.apiKey }, body: JSON.stringify({ updatedAt: Date.now(), roster: roster.value, records: records.value, users: users.value, notices: notices.value }) }); } catch(e) { throw e; } finally { loading.value = false; } };
                 const handleAuth = async () => {
                     if(!authForm.value.username || !authForm.value.password) return showToast("请输入账号密码", "error");
                     authLoading.value = true;
@@ -493,173 +698,72 @@
                         const user = users.value.find(u => u.username === username);
                         if (isRegistering.value) {
                             if (user) throw new Error("用户名已存在");
-                            const newUser = { username, password, classes: selectedClasses };
-                            users.value.push(newUser);
-                            await saveToCloud();
-                            currentUser.value = newUser;
-                            isLoggedIn.value = true;
-                            showToast("注册成功", "success");
+                            const newUser = { username, password, classes: selectedClasses }; users.value.push(newUser);
+                            await saveToCloud(); currentUser.value = newUser; isLoggedIn.value = true;
                         } else {
                             if (!user || user.password !== password) throw new Error("账号或密码错误");
-                            currentUser.value = user;
-                            isLoggedIn.value = true;
-                            showToast("登录成功", "success");
+                            currentUser.value = user; isLoggedIn.value = true;
                         }
                         if (allowedClassList.value.length > 0) currentClass.value = allowedClassList.value[0];
                     } catch (e) { showToast(e.message, "error"); } finally { authLoading.value = false; }
                 };
-
-                const logout = () => { isLoggedIn.value = false; currentUser.value = null; authForm.value = { username: '', password: '', selectedClasses: [] }; showMenu.value = false; showToast("已退出"); };
-
-                const updateUserClasses = async () => {
-                    const idx = users.value.findIndex(u => u.username === currentUser.value.username);
-                    if (idx !== -1) {
-                        users.value[idx].classes = currentUser.value.classes;
-                        await saveToCloud();
-                        showToast("已保存", "success"); showUserSetting.value = false;
-                        if (!allowedClassList.value.includes(currentClass.value)) currentClass.value = allowedClassList.value[0] || '';
-                    }
-                };
-
-                // 云同步
-                const fetchCloudData = async (silent = false) => {
-                    if(!silent) loading.value = true;
-                    try {
-                        const res = await fetch(`https://api.jsonbin.io/v3/b/${CONFIG.binId}/latest`, { headers: { 'X-Master-Key': CONFIG.apiKey } });
-                        if(!res.ok) throw new Error("网络错误");
-                        const json = await res.json();
-                        const data = json.record || {};
-                        if(data.roster) roster.value = data.roster;
-                        if(data.records) records.value = data.records;
-                        if(data.users) users.value = data.users;
-                        initRecords();
-                        if (isLoggedIn.value) {
-                            const updatedUser = users.value.find(u => u.username === currentUser.value.username);
-                            if (updatedUser) currentUser.value = updatedUser;
-                        }
-                    } catch(e) { if(!silent) showToast("同步失败", "error"); } finally { if(!silent) loading.value = false; }
-                };
-                const saveToCloud = async () => {
-                    loading.value = true;
-                    try {
-                        await fetch(`https://api.jsonbin.io/v3/b/${CONFIG.binId}`, {
-                            method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Master-Key': CONFIG.apiKey },
-                            body: JSON.stringify({ updatedAt: Date.now(), roster: roster.value, records: records.value, users: users.value })
-                        });
-                    } catch(e) { throw e; } finally { loading.value = false; }
-                };
+                const toggleAuthMode = () => { isRegistering.value = !isRegistering.value; authForm.value.selectedClasses = []; };
+                const logout = () => { isLoggedIn.value = false; currentUser.value = null; showMenu.value = false; showToast("已退出"); };
                 const uploadData = async () => { try { await saveToCloud(); showToast("上传成功", "success"); } catch(e) { showToast("上传失败", "error"); } };
-                const downloadData = async () => { if(!confirm("覆盖本地？")) return; await fetchCloudData(); showToast("下载成功", "success"); };
-
-                // 业务
-                const showToast = (msg, type='info') => { toast.value = { show: true, msg, type }; setTimeout(() => toast.value.show = false, 2000); };
-                const toggleStatus = (s) => {
-                    const sub = currentSubject.value;
-                    if(records.value[sub][s.uid]) delete records.value[sub][s.uid];
-                    else { records.value[sub][s.uid]=true; if(navigator.vibrate) navigator.vibrate(50); }
-                };
-
-                // 导入 & 班级管理
-                const triggerFileUpload = () => { const el = document.getElementById('file-upload'); if(el) el.click(); };
+                const downloadData = async () => { if(confirm("覆盖本地？")) { await fetchCloudData(); showToast("下载成功", "success"); } };
+                const updateUserClasses = async () => { const idx = users.value.findIndex(u => u.username === currentUser.value.username); if (idx !== -1) { users.value[idx].classes = currentUser.value.classes; await saveToCloud(); showToast("已保存", "success"); showUserSetting.value = false; if (!allowedClassList.value.includes(currentClass.value)) currentClass.value = allowedClassList.value[0] || ''; } };
+                const triggerFileUpload = () => { document.getElementById('file-upload').click(); };
                 const handleFileUpload = (e) => {
                     const file = e.target.files[0]; if (!file) return;
-                    const reader = new FileReader();
-                    reader.onload = (evt) => {
+                    const reader = new FileReader(); reader.onload = (evt) => {
                         try {
                             const wb = XLSX.read(new Uint8Array(evt.target.result), { type: 'array' });
-                            const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-                            const newRoster = [];
-                            json.forEach(row => {
-                                const c = row['班级']||row['class']; const n = row['学号']||row['no']; const name = row['姓名']||row['name'];
-                                if(c && name) newRoster.push({ classId:String(c).trim(), no:String(n||'').trim().padStart(2,'0'), name, uid:`${String(c).trim()}-${String(n||'').trim().padStart(2,'0')}` });
-                            });
-                            if (newRoster.length > 0 && confirm(`识别到 ${newRoster.length} 人，确定导入？`)) {
-                                const exist = new Set(roster.value.map(s=>s.uid));
-                                roster.value = [...roster.value, ...newRoster.filter(s=>!exist.has(s.uid))];
-                                showToast("导入成功", "success");
-                                if(currentUser.value.classes.length === 0) { showUserSetting.value = true; showToast("请勾选您的班级", "info"); }
-                            }
-                        } catch (err) { showToast("解析失败", "error"); }
-                        e.target.value = ''; showMenu.value = false;
-                    };
-                    reader.readAsArrayBuffer(file);
+                            const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]); const newRoster = [];
+                            json.forEach(row => { const c = row['班级']||row['class']; const n = row['学号']||row['no']; const name = row['姓名']||row['name']; if(c && name) newRoster.push({ classId:String(c).trim(), no:String(n||'').trim().padStart(2,'0'), name, uid:`${String(c).trim()}-${String(n||'').trim().padStart(2,'0')}` }); });
+                            if (newRoster.length > 0 && confirm(`识别到 ${newRoster.length} 人，确定导入？`)) { const exist = new Set(roster.value.map(s=>s.uid)); roster.value = [...roster.value, ...newRoster.filter(s=>!exist.has(s.uid))]; showToast("导入成功", "success"); if(currentUser.value.classes.length === 0) { showUserSetting.value = true; showToast("请勾选您的班级", "info"); } }
+                        } catch (err) { showToast("解析失败", "error"); } e.target.value = ''; showMenu.value = false;
+                    }; reader.readAsArrayBuffer(file);
                 };
-                const deleteClass = (c) => {
-                    if(confirm(`删除 ${c} 班？`)) {
-                        const toDel = roster.value.filter(s=>s.classId===c).map(s=>s.uid);
-                        roster.value = roster.value.filter(s=>s.classId!==c);
-                        subjects.forEach(sub => { if(records.value[sub]) toDel.forEach(uid => delete records.value[sub][uid]); });
-                        if(currentClass.value===c) currentClass.value = allowedClassList.value[0]||'';
-                        showToast("已删除", "success");
-                    }
-                };
-
-                // 导出 (包含微信检测)
+                const deleteClass = (c) => { if(confirm(`删除 ${c} 班数据？`)) { roster.value = roster.value.filter(s=>s.classId!==c); subjects.forEach(sub => { if(records.value[sub]) Object.keys(records.value[sub]).forEach(uid => { if(uid.startsWith(c+'-')) delete records.value[sub][uid]; }); }); if(currentClass.value===c) currentClass.value = allowedClassList.value[0]||''; showToast("已删除", "success"); } };
                 const exportExcel = () => {
-                    const ua = navigator.userAgent.toLowerCase();
-                    if(ua.match(/MicroMessenger/i)) {
-                        showMenu.value = false;
-                        showWeChatTip.value = true; // 显示微信提示
-                        return;
-                    }
-                    const data = currentList.value.map(s => ({ "班级":s.classId, "学号":s.no, "姓名":s.name, "科目":currentSubject.value, "状态":s.submitted?"已交":"未交" }));
+                    if(navigator.userAgent.match(/MicroMessenger/i)) { showMenu.value = false; showWeChatTip.value = true; return; }
+                    const data = currentList.value.map(s => ({ "班级":s.classId, "学号":s.no, "姓名":s.name, "科目":currentSubject.value, "状态": s.submitted ? "已交" : "未交", "图片数": s.imgCount }));
                     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), currentSubject.value);
-                    XLSX.writeFile(wb, `${currentSubject.value}_统计.xlsx`); showMenu.value=false;
+                    XLSX.writeFile(wb, `${currentClass.value}班_${currentSubject.value}_统计.xlsx`); showMenu.value=false;
                 };
+                const resetCurrentSubject = () => { if(confirm("重置当前科目记录？")) { records.value[currentSubject.value]={}; showToast("已重置"); showMenu.value=false; } };
+                const preparePrint = async () => { showMenu.value = false; if(currentList.value.length === 0) return showToast("无数据"); printing.value = true; await nextTick(); document.querySelectorAll('.qr-img-container').forEach(e => e.innerHTML=''); currentList.value.forEach(s => { const el = document.getElementById('qrcode-' + s.uid); if(el) new QRCode(el, { text: s.uid, width: 120, height: 120 }); }); setTimeout(() => { window.print(); setTimeout(() => printing.value = false, 1000); }, 500); };
 
-                const resetCurrentSubject = () => { if(confirm("重置当前科目？")) { records.value[currentSubject.value]={}; showToast("已重置"); showMenu.value=false; } };
+                const startScan = () => {
+                    scanning.value = true;
+                    nextTick(() => {
+                        html5QrcodeScanner = new Html5Qrcode("reader");
+                        html5QrcodeScanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, (txt) => {
+                            const s = roster.value.find(i => i.uid === txt);
+                            if (s) {
+                                // 扫码成功逻辑
+                                setRec(txt, { ...getRec(txt), submitted: true, ts: Date.now() });
+                                
+                                // --- 核心：震动反馈 ---
+                                if (navigator.vibrate) {
+                                    try { navigator.vibrate(200); } catch(e){}
+                                }
+                                // -------------------
 
-                // 打印修复逻辑 (终极版)
-                const preparePrint = async () => {
-                    showMenu.value = false;
-                    if(currentList.value.length === 0) return showToast("无数据");
-                    
-                    // 1. 开启打印模式：此时 #print-area 会覆盖全屏，强制可见，但 z-index 极高
-                    printing.value = true;
-                    await nextTick(); // 等待 DOM 更新
-                    
-                    // 2. 清空并重新生成
-                    document.querySelectorAll('.qr-img-container').forEach(e => e.innerHTML='');
-                    
-                    // 3. 逐个生成二维码 (此时元素在屏幕上是可见的，QRCode.js 可以工作)
-                    currentList.value.forEach(s => {
-                        const el = document.getElementById('qrcode-' + s.uid);
-                        if(el) {
-                            new QRCode(el, { text: s.uid, width: 120, height: 120, correctLevel: QRCode.CorrectLevel.M });
-                        }
+                                showToast(`${s.name} OK`, "success");
+                            }
+                        });
                     });
-
-                    // 4. 稍作延时，确保图片渲染完成，然后调用打印
-                    setTimeout(() => {
-                        window.print();
-                        // 打印窗口关闭后，恢复界面
-                        setTimeout(() => { printing.value = false; }, 1000);
-                    }, 500);
                 };
-
-                // 扫码
-                const startScan = () => { scanning.value=true; nextTick(()=>{ html5QrcodeScanner=new Html5Qrcode("reader"); html5QrcodeScanner.start({facingMode:"environment"},{fps:10,qrbox:{width:250,height:250}}, onScanSuccess); }); };
                 const stopScan = () => { if(html5QrcodeScanner) html5QrcodeScanner.stop().then(()=>{html5QrcodeScanner.clear();scanning.value=false;}); else scanning.value=false; };
-                let lastUid=null, lastT=0;
-                const onScanSuccess = (txt) => {
-                    if(txt===lastUid && Date.now()-lastT<2000) return; lastUid=txt; lastT=Date.now();
-                    const s = roster.value.find(i=>i.uid===txt);
-                    if(!s) return showToast("无效码", "error");
-                    if(!allowedClassList.value.includes(s.classId)) return showToast(`无 ${s.classId} 班权限`, "error");
-                    const sub = currentSubject.value;
-                    if(!records.value[sub][txt]) { records.value[sub][txt]=true; if(navigator.vibrate) navigator.vibrate(200); showToast(`${s.name} ${sub} OK`, "success"); }
-                    else showToast("已交", "info");
-                };
 
                 onMounted(() => fetchCloudData(true));
 
                 return {
                     subjects, currentSubject, currentClass, allowedClassList, allClassList, currentList, percentage, submittedCount,
-                    isLoggedIn, currentUser, isRegistering, authForm, authLoading,
-                    showMenu, showClassManager, showUserSetting, showWeChatTip, scanning, printing, loading, toast,
-                    handleAuth, toggleAuthMode, logout, updateUserClasses,
-                    toggleStatus, startScan, stopScan, triggerFileUpload, handleFileUpload, deleteClass,
-                    exportExcel, resetCurrentSubject, uploadData, downloadData, preparePrint
+                    isLoggedIn, currentUser, isRegistering, authForm, authLoading, showMenu, showClassManager, showUserSetting, showWeChatTip, showNoticeModal, tempNoticeText, currentNotice,
+                    scanning, printing, loading, toast, newStudent, cameraActive, cameraError, previewImageModal, singleBigImg, currentPhotoStudent, tempImages,
+                    handleAuth, toggleAuthMode, logout, updateUserClasses, toggleStatus, openNoticeModal, saveNotice, clearNotice, openCamera, closeCamera, triggerSystemCamera, handleSystemCamera, takePhoto, saveAndCloseCamera, viewImages, viewSingleBig, deleteImage, deleteAllImages, addManualStudent, deleteClass, triggerFileUpload, handleFileUpload, exportExcel, resetCurrentSubject, uploadData, downloadData, preparePrint, startScan, stopScan
                 };
             }
         }).mount('#app');
