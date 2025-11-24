@@ -32,7 +32,32 @@
             -webkit-tap-highlight-color: transparent; user-select: none;
         }
 
-        /* --- 登录/注册全屏蒙版 --- */
+        /* --- 打印优化 --- */
+        #print-area { display: none; }
+        @media print {
+            .header-section, .fab-container, .modal-overlay, .main-content, .toast { display: none !important; }
+            #print-area { display: block; padding: 10px; font-family: sans-serif; }
+            .print-title { text-align: center; margin-bottom: 20px; font-size: 24px; }
+            .qr-grid { 
+                display: grid; 
+                grid-template-columns: repeat(3, 1fr); 
+                gap: 15px; 
+            }
+            .qr-card {
+                border: 1px dashed #aaa;
+                padding: 15px 10px;
+                text-align: center;
+                page-break-inside: avoid;
+                border-radius: 8px;
+            }
+            .qr-img-container { margin-bottom: 5px; }
+            .qr-img-container img { margin: 0 auto; display: block; }
+            .qr-info { font-size: 14px; font-weight: bold; margin-top: 5px; }
+            .qr-sub { font-size: 10px; color: #666; }
+        }
+
+
+        /* --- 认证界面 --- */
         .auth-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: linear-gradient(135deg, var(--primary), var(--accent));
@@ -50,8 +75,7 @@
         }
         .auth-btn {
             width: 100%; padding: 12px; background: var(--primary); color: white;
-            border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer;
-            margin-top: 10px;
+            border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 10px;
         }
         .auth-btn.secondary { background: #f0f0f0; color: #666; margin-top: 10px; }
         .class-select-group {
@@ -60,7 +84,7 @@
         .checkbox-item { display: flex; align-items: center; margin-bottom: 8px; font-size: 14px; }
         .checkbox-item input { margin-right: 10px; transform: scale(1.2); }
 
-        /* --- 主界面样式 --- */
+        /* --- 主界面 --- */
         .header-section {
             background: linear-gradient(135deg, var(--primary), var(--accent));
             padding: 20px 20px 10px; border-radius: 0 0 24px 24px; color: white;
@@ -76,7 +100,6 @@
             display: flex; gap: 10px; overflow-x: auto; padding-bottom: 15px;
             margin: 0 -10px; padding-left: 20px; padding-right: 20px; scrollbar-width: none;
         }
-        .subject-tabs::-webkit-scrollbar { display: none; }
         .subject-tab {
             background: rgba(255,255,255,0.2); color: rgba(255,255,255,0.9);
             padding: 6px 16px; border-radius: 20px; font-size: 14px; white-space: nowrap;
@@ -135,6 +158,7 @@
         }
         .fab-btn.primary { background: var(--primary); }
 
+        /* --- 弹窗与菜单 --- */
         .modal-overlay {
             position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4);
             z-index: 200; backdrop-filter: blur(3px); display: flex; align-items: flex-end; justify-content: center;
@@ -164,11 +188,6 @@
             padding: 12px; border-bottom: 1px solid #eee;
         }
         .btn-delete { color: var(--danger); background: none; border: none; padding: 8px; }
-        
-        .config-box { background: #f5f5f5; padding: 15px; border-radius: 12px; margin-bottom: 15px; margin-top: 10px; }
-        .input-group { margin-bottom: 10px; }
-        .input-group label { display: block; font-size: 12px; color: #666; margin-bottom: 4px; }
-        .input-field { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
         
         .sync-actions { display: flex; gap: 10px; margin-top: 15px; }
         .btn-full { flex: 1; padding: 12px; border-radius: 10px; border: none; font-weight: 600; cursor: pointer; }
@@ -200,29 +219,33 @@
         .toast.success { background: #00c853; }
         .toast.error { background: #d32f2f; }
 
-        #print-area { display: none; }
-        @media print {
-            body > * { display: none; }
-            #print-area { display: block; width: 100%; }
-            .qr-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-            .qr-card { border: 1px dashed #ccc; padding: 10px; text-align: center; page-break-inside: avoid; }
-            .qr-img-container img { margin: 0 auto; }
+        /* 微信提示层 */
+        .wechat-tip-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 5000; color: white;
+            text-align: right; padding: 20px 30px;
         }
     </style>
 </head>
-<body>
+<body :class="{'print-mode': printing}">
     <div id="app">
         <input type="file" id="file-upload" accept=".xlsx, .xls" @change="handleFileUpload" style="display:none" />
         
-        <!-- 认证界面 (登录/注册) -->
+        <!-- 微信内导出提示 -->
+        <div v-if="showWeChatTip" class="wechat-tip-overlay" @click="showWeChatTip=false">
+            <span class="material-icons-round" style="font-size:48px; display:block; margin-bottom:10px;">arrow_upward</span>
+            <div style="font-size:18px; font-weight:bold;">请点击右上角菜单</div>
+            <div style="font-size:16px;">选择“在浏览器打开”以导出文件</div>
+            <div style="margin-top:20px; font-size:14px; opacity:0.7;">(点击任意处关闭)</div>
+        </div>
+
+        <!-- 认证界面 -->
         <div v-if="!isLoggedIn" class="auth-overlay">
             <div class="auth-card">
                 <div class="auth-title">{{ isRegistering ? '注册新教师' : '教师登录' }}</div>
-                
                 <input class="auth-input" v-model="authForm.username" placeholder="请输入用户名" />
                 <input class="auth-input" v-model="authForm.password" type="password" placeholder="请输入密码" />
                 
-                <!-- 注册时的班级选择 -->
                 <div v-if="isRegistering">
                     <div style="font-size:14px; margin-bottom:5px; color:#666;">请选择您任教的班级:</div>
                     <div class="class-select-group">
@@ -246,7 +269,7 @@
             <div style="margin-top:20px; font-size:12px; opacity:0.8;">作业登记系统 Pro</div>
         </div>
 
-        <!-- 主界面 (登录后显示) -->
+        <!-- 主界面 -->
         <template v-else>
             <header class="header-section">
                 <div class="nav-top">
@@ -275,7 +298,6 @@
 
                 <div class="info-bar">
                     <div class="class-selector">
-                        <!-- 只显示该用户有权限的班级 -->
                         <div v-if="allowedClassList.length === 0" style="padding:5px; font-size:12px; color:rgba(255,255,255,0.7);">
                             无负责班级
                         </div>
@@ -389,10 +411,21 @@
             </div>
         </div>
 
-        <!-- 扫描 & Toast & Print (保持不变) -->
+        <!-- 扫描 & Toast -->
         <div v-if="scanning" class="scanner-overlay"><div id="reader" style="width:100%;height:100%"></div><div class="scan-frame"></div><button class="scan-close" @click="stopScan">关闭</button></div>
         <div class="toast" :class="{show: toast.show, success: toast.type === 'success', error: toast.type === 'error'}"><span class="material-icons-round">{{ toast.type === 'success'?'check_circle':'info' }}</span><span>{{ toast.msg }}</span></div>
-        <div id="print-area"><div style="text-align:center;font-size:24px;margin-bottom:20px;">{{currentClass}}班 学生二维码</div><div class="qr-grid"><div v-for="s in currentList" :key="'qr-'+s.uid" class="qr-card"><div class="qr-img-container" :id="'qrcode-'+s.uid"></div><div style="font-weight:bold;">{{s.name}}</div><div style="font-size:12px;">{{s.classId}}班 {{s.no}}号</div></div></div></div>
+        
+        <!-- 打印区域 (核心修复点) -->
+        <div id="print-area">
+            <div style="text-align:center;font-size:24px;margin-bottom:20px; font-weight:bold;">{{currentClass}}班 学生二维码</div>
+            <div class="qr-grid">
+                <div v-for="s in currentList" :key="'qr-'+s.uid" class="qr-card">
+                    <div class="qr-img-container" :id="'qrcode-'+s.uid"></div>
+                    <div style="font-weight:bold; font-size:16px;">{{s.name}}</div>
+                    <div style="font-size:12px; color:#666;">{{s.classId}}班 - {{s.no}}号</div>
+                </div>
+            </div>
+        </div>
 
     </div>
 
@@ -407,14 +440,14 @@
                 const currentSubject = ref('语文');
                 const currentClass = ref('');
                 
-                // 数据核心
-                const roster = ref([]); // 全校名单
-                const records = ref({}); // 全校记录
-                const users = ref([]); // 用户列表 [{username, password, classes:[]}]
+                // 数据
+                const roster = ref([]); 
+                const records = ref({}); 
+                const users = ref([]); 
                 
                 // 状态
                 const isLoggedIn = ref(false);
-                const currentUser = ref(null); // {username, classes:[]}
+                const currentUser = ref(null);
                 const isRegistering = ref(false);
                 const authLoading = ref(false);
                 const authForm = ref({ username: '', password: '', selectedClasses: [] });
@@ -422,30 +455,23 @@
                 const showMenu = ref(false);
                 const showClassManager = ref(false);
                 const showUserSetting = ref(false);
+                const showWeChatTip = ref(false);
                 const scanning = ref(false);
+                const printing = ref(false); // 打印状态
                 const loading = ref(false);
                 const toast = ref({ show: false, msg: '', type: 'info' });
                 let html5QrcodeScanner = null;
 
                 const initRecords = () => subjects.forEach(sub => { if (!records.value[sub]) records.value[sub] = {}; });
 
-                // --- 核心计算属性 ---
-                // 所有存在的班级
                 const allClassList = computed(() => [...new Set(roster.value.map(s => s.classId))].sort());
-                
-                // 当前用户有权限看到的班级
                 const allowedClassList = computed(() => {
                     if (!currentUser.value || !currentUser.value.classes) return [];
-                    // 取交集：既在名单里存在，又在用户权限里
                     return allClassList.value.filter(c => currentUser.value.classes.includes(c));
                 });
-
-                // 当前显示的列表 (受权限控制)
                 const currentList = computed(() => {
                     if (!currentClass.value) return [];
-                    // 安全检查：如果当前选中的班级不在权限内，返回空
                     if (!allowedClassList.value.includes(currentClass.value)) return [];
-                    
                     const list = roster.value.filter(s => s.classId == currentClass.value);
                     return list.map(s => ({
                         ...s,
@@ -456,142 +482,87 @@
                 const submittedCount = computed(() => currentList.value.filter(s => s.submitted).length);
                 const percentage = computed(() => currentList.value.length === 0 ? 0 : Math.round((submittedCount.value / currentList.value.length) * 100));
 
-                // --- 认证逻辑 ---
+                // 认证逻辑
                 const toggleAuthMode = () => { isRegistering.value = !isRegistering.value; authForm.value.selectedClasses = []; };
-
                 const handleAuth = async () => {
                     if(!authForm.value.username || !authForm.value.password) return showToast("请输入账号密码", "error");
                     authLoading.value = true;
-
                     try {
-                        // 1. 先拉取最新数据，确保用户列表是最新的
-                        await fetchCloudData(true); // true = silent loading
-
+                        await fetchCloudData(true);
                         const { username, password, selectedClasses } = authForm.value;
                         const user = users.value.find(u => u.username === username);
-
                         if (isRegistering.value) {
                             if (user) throw new Error("用户名已存在");
-                            // 注册新用户
                             const newUser = { username, password, classes: selectedClasses };
                             users.value.push(newUser);
-                            // 立即保存到云端
                             await saveToCloud();
                             currentUser.value = newUser;
                             isLoggedIn.value = true;
                             showToast("注册成功", "success");
                         } else {
-                            // 登录
                             if (!user || user.password !== password) throw new Error("账号或密码错误");
                             currentUser.value = user;
                             isLoggedIn.value = true;
                             showToast("登录成功", "success");
                         }
-
-                        // 登录后逻辑：自动选择第一个有权限的班级
                         if (allowedClassList.value.length > 0) currentClass.value = allowedClassList.value[0];
-                        
-                    } catch (e) {
-                        showToast(e.message, "error");
-                    } finally {
-                        authLoading.value = false;
-                    }
+                    } catch (e) { showToast(e.message, "error"); } finally { authLoading.value = false; }
                 };
 
-                const logout = () => {
-                    isLoggedIn.value = false;
-                    currentUser.value = null;
-                    authForm.value = { username: '', password: '', selectedClasses: [] };
-                    showMenu.value = false;
-                    showToast("已退出登录");
-                };
+                const logout = () => { isLoggedIn.value = false; currentUser.value = null; authForm.value = { username: '', password: '', selectedClasses: [] }; showMenu.value = false; showToast("已退出"); };
 
                 const updateUserClasses = async () => {
-                    // 更新当前用户的班级权限并保存到云端
-                    // 在 users 数组中找到当前用户并更新
                     const idx = users.value.findIndex(u => u.username === currentUser.value.username);
                     if (idx !== -1) {
                         users.value[idx].classes = currentUser.value.classes;
                         await saveToCloud();
-                        showToast("设置已保存", "success");
-                        showUserSetting.value = false;
-                        // 如果当前班级不在新权限内，重置
-                        if (!allowedClassList.value.includes(currentClass.value)) {
-                            currentClass.value = allowedClassList.value[0] || '';
-                        }
+                        showToast("已保存", "success"); showUserSetting.value = false;
+                        if (!allowedClassList.value.includes(currentClass.value)) currentClass.value = allowedClassList.value[0] || '';
                     }
                 };
 
-                // --- 云端交互 ---
+                // 云同步
                 const fetchCloudData = async (silent = false) => {
                     if(!silent) loading.value = true;
                     try {
-                        const res = await fetch(`https://api.jsonbin.io/v3/b/${CONFIG.binId}/latest`, {
-                            headers: { 'X-Master-Key': CONFIG.apiKey }
-                        });
+                        const res = await fetch(`https://api.jsonbin.io/v3/b/${CONFIG.binId}/latest`, { headers: { 'X-Master-Key': CONFIG.apiKey } });
                         if(!res.ok) throw new Error("网络错误");
                         const json = await res.json();
                         const data = json.record || {};
-                        
                         if(data.roster) roster.value = data.roster;
                         if(data.records) records.value = data.records;
                         if(data.users) users.value = data.users;
-                        
                         initRecords();
-                        // 如果已登录，需同步更新当前用户的引用
                         if (isLoggedIn.value) {
                             const updatedUser = users.value.find(u => u.username === currentUser.value.username);
                             if (updatedUser) currentUser.value = updatedUser;
                         }
-                    } catch(e) { 
-                        if(!silent) showToast("数据同步失败", "error"); 
-                        console.error(e);
-                    } finally { 
-                        if(!silent) loading.value = false; 
-                    }
+                    } catch(e) { if(!silent) showToast("同步失败", "error"); } finally { if(!silent) loading.value = false; }
                 };
-
                 const saveToCloud = async () => {
                     loading.value = true;
                     try {
                         await fetch(`https://api.jsonbin.io/v3/b/${CONFIG.binId}`, {
-                            method: 'PUT',
-                            headers: { 'Content-Type': 'application/json', 'X-Master-Key': CONFIG.apiKey },
-                            body: JSON.stringify({ 
-                                updatedAt: Date.now(), 
-                                roster: roster.value, 
-                                records: records.value,
-                                users: users.value // 保存用户数据
-                            })
+                            method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Master-Key': CONFIG.apiKey },
+                            body: JSON.stringify({ updatedAt: Date.now(), roster: roster.value, records: records.value, users: users.value })
                         });
-                    } catch(e) { throw e; } 
-                    finally { loading.value = false; }
+                    } catch(e) { throw e; } finally { loading.value = false; }
                 };
+                const uploadData = async () => { try { await saveToCloud(); showToast("上传成功", "success"); } catch(e) { showToast("上传失败", "error"); } };
+                const downloadData = async () => { if(!confirm("覆盖本地？")) return; await fetchCloudData(); showToast("下载成功", "success"); };
 
-                const uploadData = async () => {
-                    try { await saveToCloud(); showToast("上传成功", "success"); } 
-                    catch(e) { showToast("上传失败", "error"); }
-                };
-
-                const downloadData = async () => {
-                    if(!confirm("覆盖本地数据？")) return;
-                    await fetchCloudData();
-                    showToast("下载成功", "success");
-                };
-
-                // --- 其他业务逻辑 ---
+                // 业务
                 const showToast = (msg, type='info') => { toast.value = { show: true, msg, type }; setTimeout(() => toast.value.show = false, 2000); };
                 const toggleStatus = (s) => {
                     const sub = currentSubject.value;
                     if(records.value[sub][s.uid]) delete records.value[sub][s.uid];
                     else { records.value[sub][s.uid]=true; if(navigator.vibrate) navigator.vibrate(50); }
                 };
-                
-                // 导入
+
+                // 导入 & 班级管理
                 const triggerFileUpload = () => { const el = document.getElementById('file-upload'); if(el) el.click(); };
                 const handleFileUpload = (e) => {
-                    const file = e.target.files[0];
-                    if (!file) return;
+                    const file = e.target.files[0]; if (!file) return;
                     const reader = new FileReader();
                     reader.onload = (evt) => {
                         try {
@@ -602,24 +573,17 @@
                                 const c = row['班级']||row['class']; const n = row['学号']||row['no']; const name = row['姓名']||row['name'];
                                 if(c && name) newRoster.push({ classId:String(c).trim(), no:String(n||'').trim().padStart(2,'0'), name, uid:`${String(c).trim()}-${String(n||'').trim().padStart(2,'0')}` });
                             });
-                            if (newRoster.length > 0) {
-                                if(confirm(`识别到 ${newRoster.length} 人，确定导入？`)) {
-                                    const exist = new Set(roster.value.map(s=>s.uid));
-                                    roster.value = [...roster.value, ...newRoster.filter(s=>!exist.has(s.uid))];
-                                    showToast("导入成功", "success");
-                                    // 自动更新当前用户权限，如果他是刚注册且没选班级
-                                    if(currentUser.value.classes.length === 0) {
-                                        showUserSetting.value = true;
-                                        showToast("请在设置中勾选您的班级", "info");
-                                    }
-                                }
-                            } else showToast("格式错误", "error");
+                            if (newRoster.length > 0 && confirm(`识别到 ${newRoster.length} 人，确定导入？`)) {
+                                const exist = new Set(roster.value.map(s=>s.uid));
+                                roster.value = [...roster.value, ...newRoster.filter(s=>!exist.has(s.uid))];
+                                showToast("导入成功", "success");
+                                if(currentUser.value.classes.length === 0) { showUserSetting.value = true; showToast("请勾选您的班级", "info"); }
+                            }
                         } catch (err) { showToast("解析失败", "error"); }
                         e.target.value = ''; showMenu.value = false;
                     };
                     reader.readAsArrayBuffer(file);
                 };
-
                 const deleteClass = (c) => {
                     if(confirm(`删除 ${c} 班？`)) {
                         const toDel = roster.value.filter(s=>s.classId===c).map(s=>s.uid);
@@ -630,12 +594,48 @@
                     }
                 };
 
+                // 导出 (包含微信检测)
                 const exportExcel = () => {
+                    const ua = navigator.userAgent.toLowerCase();
+                    if(ua.match(/MicroMessenger/i)) {
+                        showMenu.value = false;
+                        showWeChatTip.value = true; // 显示微信提示
+                        return;
+                    }
                     const data = currentList.value.map(s => ({ "班级":s.classId, "学号":s.no, "姓名":s.name, "科目":currentSubject.value, "状态":s.submitted?"已交":"未交" }));
                     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), currentSubject.value);
                     XLSX.writeFile(wb, `${currentSubject.value}_统计.xlsx`); showMenu.value=false;
                 };
+
                 const resetCurrentSubject = () => { if(confirm("重置当前科目？")) { records.value[currentSubject.value]={}; showToast("已重置"); showMenu.value=false; } };
+
+                // 打印修复逻辑 (终极版)
+                const preparePrint = async () => {
+                    showMenu.value = false;
+                    if(currentList.value.length === 0) return showToast("无数据");
+                    
+                    // 1. 开启打印模式：此时 #print-area 会覆盖全屏，强制可见，但 z-index 极高
+                    printing.value = true;
+                    await nextTick(); // 等待 DOM 更新
+                    
+                    // 2. 清空并重新生成
+                    document.querySelectorAll('.qr-img-container').forEach(e => e.innerHTML='');
+                    
+                    // 3. 逐个生成二维码 (此时元素在屏幕上是可见的，QRCode.js 可以工作)
+                    currentList.value.forEach(s => {
+                        const el = document.getElementById('qrcode-' + s.uid);
+                        if(el) {
+                            new QRCode(el, { text: s.uid, width: 120, height: 120, correctLevel: QRCode.CorrectLevel.M });
+                        }
+                    });
+
+                    // 4. 稍作延时，确保图片渲染完成，然后调用打印
+                    setTimeout(() => {
+                        window.print();
+                        // 打印窗口关闭后，恢复界面
+                        setTimeout(() => { printing.value = false; }, 1000);
+                    }, 500);
+                };
 
                 // 扫码
                 const startScan = () => { scanning.value=true; nextTick(()=>{ html5QrcodeScanner=new Html5Qrcode("reader"); html5QrcodeScanner.start({facingMode:"environment"},{fps:10,qrbox:{width:250,height:250}}, onScanSuccess); }); };
@@ -645,29 +645,18 @@
                     if(txt===lastUid && Date.now()-lastT<2000) return; lastUid=txt; lastT=Date.now();
                     const s = roster.value.find(i=>i.uid===txt);
                     if(!s) return showToast("无效码", "error");
-                    // 检查该班级是否在用户权限内
-                    if(!allowedClassList.value.includes(s.classId)) return showToast(`您没有 ${s.classId} 班的权限`, "error");
-                    
+                    if(!allowedClassList.value.includes(s.classId)) return showToast(`无 ${s.classId} 班权限`, "error");
                     const sub = currentSubject.value;
                     if(!records.value[sub][txt]) { records.value[sub][txt]=true; if(navigator.vibrate) navigator.vibrate(200); showToast(`${s.name} ${sub} OK`, "success"); }
                     else showToast("已交", "info");
                 };
 
-                const preparePrint = async () => {
-                    showMenu.value=false; if(currentList.value.length===0) return showToast("无数据");
-                    await nextTick(); document.querySelectorAll('.qr-img-container').forEach(e=>e.innerHTML='');
-                    setTimeout(() => { currentList.value.forEach(s => { const el = document.getElementById('qrcode-'+s.uid); if(el) new QRCode(el, { text:s.uid, width:120, height:120, correctLevel:QRCode.CorrectLevel.M }); }); setTimeout(()=>window.print(),500); }, 500);
-                };
-
-                // 启动时尝试静默获取数据，判断是否需要登录
-                onMounted(() => {
-                    fetchCloudData(true);
-                });
+                onMounted(() => fetchCloudData(true));
 
                 return {
                     subjects, currentSubject, currentClass, allowedClassList, allClassList, currentList, percentage, submittedCount,
                     isLoggedIn, currentUser, isRegistering, authForm, authLoading,
-                    showMenu, showClassManager, showUserSetting, scanning, loading, toast,
+                    showMenu, showClassManager, showUserSetting, showWeChatTip, scanning, printing, loading, toast,
                     handleAuth, toggleAuthMode, logout, updateUserClasses,
                     toggleStatus, startScan, stopScan, triggerFileUpload, handleFileUpload, deleteClass,
                     exportExcel, resetCurrentSubject, uploadData, downloadData, preparePrint
