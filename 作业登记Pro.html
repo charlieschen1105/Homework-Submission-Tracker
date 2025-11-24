@@ -1,0 +1,628 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>作业上交登记 Pro</title>
+    <!-- 核心库 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <!-- 图标库 -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #4e54c8;
+            --primary-dark: #3f44a0;
+            --accent: #8f94fb;
+            --success: #00c853;
+            --bg: #f4f6f9;
+            --card-bg: #ffffff;
+            --text-main: #2c3e50;
+            --text-sub: #95a5a6;
+            --shadow: 0 4px 12px rgba(0,0,0,0.05);
+            --safe-bottom: env(safe-area-inset-bottom);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            background: var(--bg);
+            color: var(--text-main);
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        /* --- 顶部导航与统计 --- */
+        .header-section {
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            padding: 20px 20px 40px;
+            border-radius: 0 0 24px 24px;
+            color: white;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            box-shadow: 0 4px 15px rgba(78, 84, 200, 0.3);
+        }
+
+        .nav-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .app-title { font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        .menu-btn { background: rgba(255,255,255,0.2); border: none; color: white; padding: 8px; border-radius: 12px; cursor: pointer; backdrop-filter: blur(5px); }
+
+        /* 班级切换胶囊 */
+        .class-switch {
+            display: flex;
+            background: rgba(0,0,0,0.15);
+            padding: 4px;
+            border-radius: 16px;
+            margin-bottom: 15px;
+        }
+        .switch-item {
+            flex: 1;
+            text-align: center;
+            padding: 8px 0;
+            font-size: 14px;
+            border-radius: 12px;
+            color: rgba(255,255,255,0.8);
+            transition: all 0.3s ease;
+        }
+        .switch-item.active { background: white; color: var(--primary); font-weight: 600; shadow: 0 2px 8px rgba(0,0,0,0.1); }
+
+        /* 进度条统计 */
+        .stats-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 5px;
+        }
+        .stats-big { font-size: 32px; font-weight: 700; line-height: 1; }
+        .stats-label { font-size: 12px; opacity: 0.9; }
+        .progress-container {
+            height: 6px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #fff; /* Success color inside gradient header */
+            width: 0%;
+            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .progress-bar.complete { background: var(--success); }
+
+        /* --- 学生列表 --- */
+        .main-content {
+            padding: 0 15px 100px; /* Bottom padding for FAB */
+            margin-top: -20px;
+        }
+
+        .student-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 12px;
+        }
+
+        .student-card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: var(--shadow);
+            transition: transform 0.1s, box-shadow 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+        .student-card:active { transform: scale(0.96); }
+        
+        .student-avatar {
+            width: 40px; height: 40px;
+            border-radius: 50%;
+            background: #f0f2f5;
+            color: var(--text-sub);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 14px;
+            flex-shrink: 0;
+            transition: all 0.3s;
+        }
+
+        .student-info { flex: 1; overflow: hidden; }
+        .student-name { font-weight: 600; font-size: 16px; white-space: nowrap; text-overflow: ellipsis; overflow: hidden;}
+        .student-id { font-size: 12px; color: var(--text-sub); margin-top: 2px; }
+
+        /* 已上交状态 */
+        .student-card.done { border: 1px solid var(--success); background: #fafffc; }
+        .student-card.done .student-avatar { background: var(--success); color: white; }
+        .student-card.done .student-name { color: #1b5e20; }
+        
+        .check-icon {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%) scale(0);
+            color: var(--success);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .student-card.done .check-icon { transform: translateY(-50%) scale(1); }
+
+        /* --- 底部悬浮按钮 (FAB) --- */
+        .fab-container {
+            position: fixed;
+            bottom: calc(20px + var(--safe-bottom));
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 90;
+            display: flex;
+            gap: 15px;
+        }
+
+        .fab-btn {
+            height: 60px;
+            padding: 0 24px;
+            border-radius: 30px;
+            border: none;
+            background: var(--text-main);
+            color: white;
+            font-weight: 600;
+            font-size: 16px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .fab-btn.primary { background: var(--primary); }
+        .fab-btn:active { transform: scale(0.95); }
+
+        /* --- 菜单模态框 --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 200;
+            backdrop-filter: blur(3px);
+            display: flex;
+            align-items: flex-end; /* Bottom sheet style */
+        }
+        .modal-sheet {
+            background: white;
+            width: 100%;
+            border-radius: 24px 24px 0 0;
+            padding: 25px;
+            box-sizing: border-box;
+            animation: slideUp 0.3s ease;
+        }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        
+        .menu-title { font-size: 18px; font-weight: 700; margin-bottom: 20px; color: var(--text-main); }
+        .menu-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
+        .menu-item {
+            display: flex; flex-direction: column; align-items: center; gap: 8px;
+            padding: 15px; background: #f8f9fa; border-radius: 12px;
+            color: var(--text-main); font-size: 13px;
+        }
+        .menu-item:active { background: #e2e6ea; }
+        .menu-icon { font-size: 28px; color: var(--primary); }
+        .menu-item.danger .menu-icon { color: #ff5252; }
+        .close-modal { margin-top: 20px; width: 100%; padding: 12px; border: none; background: transparent; color: var(--text-sub); font-size: 14px; }
+
+        /* --- 扫描界面 --- */
+        .scanner-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: black; z-index: 300;
+        }
+        .scanner-ui {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 301;
+            display: flex; flex-direction: column;
+        }
+        .scan-header { padding: 40px 20px; text-align: center; color: white; background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent); }
+        .scan-frame {
+            flex: 1;
+            margin: 20px 40px;
+            border: 2px solid rgba(255,255,255,0.5);
+            border-radius: 20px;
+            position: relative;
+            box-shadow: 0 0 0 2000px rgba(0,0,0,0.6); /* 暗化周围 */
+        }
+        .scan-frame::after {
+            content: ''; position: absolute; top: 50%; left: 10%; right: 10%; height: 2px;
+            background: var(--success); box-shadow: 0 0 10px var(--success);
+            animation: scanLine 2s infinite;
+        }
+        @keyframes scanLine { 0% {top: 10%; opacity: 0;} 50% {opacity: 1;} 100% {top: 90%; opacity: 0;} }
+        
+        .scan-close-btn {
+            pointer-events: auto;
+            position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%);
+            background: rgba(255,255,255,0.2); border: 1px solid white;
+            color: white; padding: 10px 30px; border-radius: 30px;
+        }
+
+        /* --- Toast 提示 --- */
+        .toast {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%) translateY(-100px);
+            background: rgba(0,0,0,0.8); color: white; padding: 12px 24px;
+            border-radius: 50px; font-size: 14px; z-index: 400;
+            display: flex; align-items: center; gap: 8px;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            backdrop-filter: blur(4px);
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); }
+        .toast.success { background: rgba(0, 200, 83, 0.9); }
+
+        /* --- 打印优化 --- */
+        #print-area { display: none; }
+        @media print {
+            .header-section, .fab-container, .modal-overlay, .main-content, .toast { display: none !important; }
+            #print-area { display: block; padding: 10px; font-family: sans-serif; }
+            .print-title { text-align: center; margin-bottom: 20px; font-size: 24px; }
+            .qr-grid { 
+                display: grid; 
+                grid-template-columns: repeat(3, 1fr); 
+                gap: 15px; 
+            }
+            .qr-card {
+                border: 1px dashed #aaa;
+                padding: 15px 10px;
+                text-align: center;
+                page-break-inside: avoid;
+                border-radius: 8px;
+            }
+            .qr-img-container { margin-bottom: 5px; }
+            .qr-img-container img { margin: 0 auto; display: block; }
+            .qr-info { font-size: 14px; font-weight: bold; margin-top: 5px; }
+            .qr-sub { font-size: 10px; color: #666; }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        
+        <!-- 顶部区域 -->
+        <header class="header-section">
+            <div class="nav-top">
+                <div class="app-title">
+                    <span class="material-icons-round">assignment_turned_in</span>
+                    作业登记
+                </div>
+                <button class="menu-btn" @click="showMenu = true">
+                    <span class="material-icons-round">tune</span>
+                </button>
+            </div>
+
+            <div class="class-switch">
+                <div class="switch-item" :class="{active: currentClass === '903'}" @click="currentClass = '903'">903班</div>
+                <div class="switch-item" :class="{active: currentClass === '904'}" @click="currentClass = '904'">904班</div>
+            </div>
+
+            <div class="stats-card">
+                <div class="stats-label">上交进度 ({{submittedCount}}/{{currentList.length}})</div>
+                <div class="stats-big">{{ percentage }}%</div>
+            </div>
+            <div class="progress-container">
+                <div class="progress-bar" :class="{complete: percentage === 100}" :style="{width: percentage + '%'}"></div>
+            </div>
+        </header>
+
+        <!-- 学生列表 -->
+        <main class="main-content">
+            <div class="student-grid">
+                <div 
+                    v-for="s in currentList" 
+                    :key="s.uid" 
+                    class="student-card" 
+                    :class="{done: s.submitted}" 
+                    @click="toggleStatus(s)"
+                >
+                    <div class="student-avatar">{{ s.no }}</div>
+                    <div class="student-info">
+                        <div class="student-name">{{ s.name }}</div>
+                        <div class="student-id">{{ s.classId }}班 {{ s.no }}号</div>
+                    </div>
+                    <span class="material-icons-round check-icon">check_circle</span>
+                </div>
+            </div>
+        </main>
+
+        <!-- 悬浮扫描按钮 -->
+        <div class="fab-container">
+            <button class="fab-btn primary" @click="startScan">
+                <span class="material-icons-round">qr_code_scanner</span>
+                扫码登记
+            </button>
+        </div>
+
+        <!-- 菜单抽屉 -->
+        <div class="modal-overlay" v-if="showMenu" @click.self="showMenu = false">
+            <div class="modal-sheet">
+                <div class="menu-title">功能菜单</div>
+                <div class="menu-grid">
+                    <div class="menu-item" @click="exportExcel">
+                        <span class="material-icons-round menu-icon">file_download</span>
+                        <span>导出Excel</span>
+                    </div>
+                    <div class="menu-item" @click="preparePrint">
+                        <span class="material-icons-round menu-icon">print</span>
+                        <span>打印二维码</span>
+                    </div>
+                    <div class="menu-item danger" @click="resetData">
+                        <span class="material-icons-round menu-icon">delete_outline</span>
+                        <span>清空数据</span>
+                    </div>
+                </div>
+                <button class="close-modal" @click="showMenu = false">关闭</button>
+            </div>
+        </div>
+
+        <!-- 扫描界面 -->
+        <div v-if="scanning" class="scanner-overlay">
+            <div id="reader" style="width:100%; height:100%;"></div>
+            <div class="scanner-ui">
+                <div class="scan-header">请将二维码对准框内</div>
+                <div class="scan-frame"></div>
+                <button class="scan-close-btn" @click="stopScan">关闭扫描</button>
+            </div>
+        </div>
+
+        <!-- Toast 提示 -->
+        <div class="toast" :class="{show: toast.show, success: toast.type === 'success'}">
+            <span class="material-icons-round" v-if="toast.type === 'success'">check_circle</span>
+            <span class="material-icons-round" v-else>info</span>
+            <span>{{ toast.msg }}</span>
+        </div>
+
+        <!-- 打印区域 (隐藏) -->
+        <div id="print-area">
+            <div class="print-title">{{ currentClass }}班 学生二维码</div>
+            <div class="qr-grid">
+                <div v-for="s in currentList" :key="'qr-'+s.uid" class="qr-card">
+                    <div class="qr-img-container" :id="'qrcode-'+s.uid"></div>
+                    <div class="qr-info">{{ s.name }}</div>
+                    <div class="qr-sub">{{ s.classId }}班 - {{ s.no }}号</div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const { createApp, ref, computed, onMounted, nextTick, watch } = Vue;
+
+        // 原始数据
+        const rawData = [
+            // 903
+            {c:"903",n:"01",name:"蒋潍汐"},{c:"903",n:"02",name:"叶凡苗"},{c:"903",n:"03",name:"张舒雅"},
+            {c:"903",n:"04",name:"杨佳琦"},{c:"903",n:"05",name:"陈俊屹"},{c:"903",n:"06",name:"林芷欣"},
+            {c:"903",n:"07",name:"蒋悦"},{c:"903",n:"08",name:"张逸轩"},{c:"903",n:"09",name:"祝琪凯"},
+            {c:"903",n:"10",name:"祝雨欣"},{c:"903",n:"11",name:"陆瑾妍"},{c:"903",n:"12",name:"吴梓浩"},
+            {c:"903",n:"13",name:"伍浩天"},{c:"903",n:"16",name:"胡绮薇"},{c:"903",n:"17",name:"冯梓垚"},
+            {c:"903",n:"18",name:"鲍文焰"},{c:"903",n:"19",name:"冯欣怡"},{c:"903",n:"20",name:"庞辰"},
+            {c:"903",n:"21",name:"杨帆"},{c:"903",n:"22",name:"李文博"},{c:"903",n:"23",name:"徐思远"},
+            {c:"903",n:"24",name:"鲍秀婧"},{c:"903",n:"25",name:"王淑珍"},{c:"903",n:"26",name:"龚海超"},
+            {c:"903",n:"27",name:"蒋昕玥"},{c:"903",n:"29",name:"贺雨欣"},{c:"903",n:"30",name:"楼明涛"},
+            {c:"903",n:"31",name:"娄嘉誉"},{c:"903",n:"32",name:"赵丁童"},{c:"903",n:"33",name:"杜佳晨"},
+            {c:"903",n:"34",name:"蒋泽涵"},{c:"903",n:"35",name:"戴旭洋"},{c:"903",n:"36",name:"王诗尧"},
+            {c:"903",n:"37",name:"丁作乐"},{c:"903",n:"38",name:"高炳祺"},{c:"903",n:"39",name:"朱科诺"},
+            {c:"903",n:"40",name:"伍真瑶"},{c:"903",n:"41",name:"冯承栋"},{c:"903",n:"42",name:"施琪昊"},
+            {c:"903",n:"44",name:"胡锦棋"},
+            // 904
+            {c:"904",n:"01",name:"左佳雯"},{c:"904",n:"02",name:"王一行"},{c:"904",n:"03",name:"朱鹏辉"},
+            {c:"904",n:"04",name:"叶欣彤"},{c:"904",n:"05",name:"朱振宇"},{c:"904",n:"06",name:"王嘉乐"},
+            {c:"904",n:"08",name:"吴凌杰"},{c:"904",n:"09",name:"徐金媛"},{c:"904",n:"10",name:"程召阳"},
+            {c:"904",n:"11",name:"冯思妙"},{c:"904",n:"12",name:"鲍涵韵"},{c:"904",n:"13",name:"徐小惠"},
+            {c:"904",n:"14",name:"王懿宸"},{c:"904",n:"15",name:"胡依婷"},{c:"904",n:"16",name:"胡璟茜"},
+            {c:"904",n:"17",name:"冯若熙1"},{c:"904",n:"18",name:"王佳琦"},{c:"904",n:"19",name:"贺湘挺"},
+            {c:"904",n:"20",name:"谢幸积"},{c:"904",n:"21",name:"于璐源"},{c:"904",n:"22",name:"施语洙"},
+            {c:"904",n:"23",name:"郑梓毅"},{c:"904",n:"24",name:"叶福锦"},{c:"904",n:"25",name:"周佳渝"},
+            {c:"904",n:"26",name:"奚磊"},{c:"904",n:"27",name:"张延"},{c:"904",n:"28",name:"梅梓桐"},
+            {c:"904",n:"29",name:"胡晟晟"},{c:"904",n:"30",name:"胡心雨"},{c:"904",n:"31",name:"邬以纯"},
+            {c:"904",n:"32",name:"杨继进"},{c:"904",n:"33",name:"周颖妮"},{c:"904",n:"34",name:"林思辰"},
+            {c:"904",n:"35",name:"吴文萱"},{c:"904",n:"36",name:"冯崇伦"},{c:"904",n:"37",name:"邬敏娴"},
+            {c:"904",n:"38",name:"祝晟捷"},{c:"904",n:"39",name:"王韵茜"},{c:"904",n:"40",name:"薛淏文"},
+            {c:"904",n:"41",name:"顾珉宇"},{c:"904",n:"42",name:"常皓轩"},{c:"904",n:"43",name:"李恒翔"}
+        ];
+
+        createApp({
+            setup() {
+                const currentClass = ref("903");
+                const students = ref([]);
+                const scanning = ref(false);
+                const showMenu = ref(false);
+                const toast = ref({ show: false, msg: '', type: 'info' });
+                
+                let html5QrcodeScanner = null;
+                let beepAudio = null;
+
+                // 简单的Beep音效生成
+                const playBeep = () => {
+                    try {
+                        if (!beepAudio) {
+                            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                            const osc = ctx.createOscillator();
+                            const gain = ctx.createGain();
+                            osc.connect(gain);
+                            gain.connect(ctx.destination);
+                            osc.start();
+                            osc.stop(0.1);
+                            beepAudio = true; // 占位，实际每次都重建比较简单
+                        } else {
+                            // 再次触发
+                             const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                             const osc = ctx.createOscillator();
+                             osc.frequency.value = 880;
+                             osc.connect(ctx.destination);
+                             osc.start();
+                             osc.stop(ctx.currentTime + 0.1);
+                        }
+                    } catch(e) { console.log("Audio blocked"); }
+                };
+
+                const showToast = (msg, type='info') => {
+                    toast.value = { show: true, msg, type };
+                    setTimeout(() => toast.value.show = false, 2000);
+                };
+
+                // 初始化
+                const initData = () => {
+                    const saved = JSON.parse(localStorage.getItem('homework_status_v2') || '{}');
+                    students.value = rawData.map(s => {
+                        const uid = `${s.c}-${s.n}`;
+                        return {
+                            classId: s.c, no: s.n, name: s.name, uid: uid,
+                            submitted: !!saved[uid]
+                        };
+                    });
+                };
+
+                watch(students, (newVal) => {
+                    const statusMap = {};
+                    newVal.forEach(s => { if (s.submitted) statusMap[s.uid] = true; });
+                    localStorage.setItem('homework_status_v2', JSON.stringify(statusMap));
+                }, { deep: true });
+
+                const currentList = computed(() => students.value.filter(s => s.classId === currentClass.value));
+                const submittedCount = computed(() => currentList.value.filter(s => s.submitted).length);
+                const percentage = computed(() => {
+                    if(currentList.value.length === 0) return 0;
+                    return Math.round((submittedCount.value / currentList.value.length) * 100);
+                });
+
+                const toggleStatus = (s) => {
+                    s.submitted = !s.submitted;
+                    // 震动反馈
+                    if(s.submitted && navigator.vibrate) navigator.vibrate(50);
+                };
+
+                const resetData = () => {
+                    if(confirm("确定清空所有记录吗？操作不可撤销。")) {
+                        students.value.forEach(s => s.submitted = false);
+                        localStorage.removeItem('homework_status_v2');
+                        showMenu.value = false;
+                        showToast("数据已清空");
+                    }
+                };
+
+                const exportExcel = () => {
+                    const data = students.value.map(s => ({
+                        "班级": s.classId,
+                        "学号": s.no,
+                        "姓名": s.name,
+                        "状态": s.submitted ? "已上交" : "未上交"
+                    }));
+                    const ws = XLSX.utils.json_to_sheet(data);
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, "统计表");
+                    const dateStr = new Date().toLocaleDateString().replace(/\//g, '-');
+                    XLSX.writeFile(wb, `作业统计_${dateStr}.xlsx`);
+                    showMenu.value = false;
+                };
+
+                const preparePrint = async () => {
+                    showMenu.value = false;
+                    // 等待DOM渲染
+                    await nextTick();
+                    // 清理旧码
+                    document.querySelectorAll('.qr-img-container').forEach(el => el.innerHTML = '');
+                    
+                    showToast("正在生成二维码...", "info");
+                    
+                    setTimeout(() => {
+                        currentList.value.forEach(s => {
+                            const el = document.getElementById('qrcode-' + s.uid);
+                            if (el) {
+                                new QRCode(el, {
+                                    text: s.uid,
+                                    width: 120,
+                                    height: 120,
+                                    correctLevel: QRCode.CorrectLevel.M
+                                });
+                            }
+                        });
+                        setTimeout(() => window.print(), 500);
+                    }, 500);
+                };
+
+                const startScan = () => {
+                    scanning.value = true;
+                    nextTick(() => {
+                        html5QrcodeScanner = new Html5Qrcode("reader");
+                        // 针对手机竖屏优化扫描区域
+                        const qrboxSize = Math.min(window.innerWidth * 0.7, 250);
+                        
+                        html5QrcodeScanner.start(
+                            { facingMode: "environment" },
+                            { fps: 10, qrbox: { width: qrboxSize, height: qrboxSize } },
+                            onScanSuccess
+                        ).catch(() => {
+                            showToast("无法开启相机，请检查权限", "info");
+                            scanning.value = false;
+                        });
+                    });
+                };
+
+                const stopScan = () => {
+                    if (html5QrcodeScanner) {
+                        html5QrcodeScanner.stop().then(() => {
+                            html5QrcodeScanner.clear();
+                            scanning.value = false;
+                        });
+                    } else {
+                        scanning.value = false;
+                    }
+                };
+
+                // 防止重复扫描的简单的节流
+                let lastScannedUid = null;
+                let lastScanTime = 0;
+
+                const onScanSuccess = (decodedText) => {
+                    const now = Date.now();
+                    // 2秒内不重复处理同一个码
+                    if (decodedText === lastScannedUid && (now - lastScanTime < 2000)) return;
+                    
+                    lastScannedUid = decodedText;
+                    lastScanTime = now;
+
+                    const student = students.value.find(s => s.uid === decodedText);
+                    if (student) {
+                        if (!student.submitted) {
+                            student.submitted = true;
+                            playBeep();
+                            if (navigator.vibrate) navigator.vibrate(200);
+                            showToast(`${student.name} 上交成功`, "success");
+                        } else {
+                            playBeep();
+                            showToast(`${student.name} 已经交过了`, "info");
+                        }
+                    } else {
+                        showToast("无效的二维码", "info");
+                    }
+                };
+
+                onMounted(initData);
+
+                return {
+                    currentClass, currentList, submittedCount, percentage,
+                    students, scanning, showMenu, toast,
+                    toggleStatus, startScan, stopScan,
+                    resetData, exportExcel, preparePrint
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
