@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>全科作业登记 Pro (云同步版)</title>
+    <title>Homework Tracker Pro </title>
     <!-- 核心库 -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
@@ -82,6 +82,9 @@
 
         .nav-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
         .app-title { font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+        
+        .sync-status { font-size: 10px; opacity: 0.8; margin-right: 5px; display: flex; flex-direction: column; align-items: flex-end; }
+
         .icon-btn { background: rgba(255,255,255,0.2); border: none; color: white; padding: 8px; border-radius: 12px; cursor: pointer; backdrop-filter: blur(5px); margin-left: 8px; }
         .notice-dot { position:absolute; top:8px; right:8px; width:8px; height:8px; background:var(--danger); border-radius:50%; border:2px solid var(--accent); }
 
@@ -279,8 +282,13 @@
                         全科作业登记
                     </div>
                     <div style="display:flex; align-items:center;">
-                        <span v-if="syncing" style="font-size:14px; margin-right:8px; opacity:0.8;" class="icon-spin">sync</span>
-                        <span style="font-size:12px; opacity:0.8; margin-right:5px;">{{ currentUser.username }}</span>
+                        <div class="sync-status">
+                            <span>{{ currentUser.username }}</span>
+                            <span v-if="lastSyncTime" style="font-size:9px;">{{lastSyncTime}} 同步</span>
+                        </div>
+                        <button v-if="syncing" class="icon-btn" style="padding:4px;"><span class="material-icons-round icon-spin" style="font-size:18px;">sync</span></button>
+                        <button v-else class="icon-btn" @click="manualSync" style="padding:4px;"><span class="material-icons-round" style="font-size:18px;">cloud_done</span></button>
+                        
                         <button class="icon-btn" @click="openNoticeModal" style="position:relative;">
                             <span class="material-icons-round">campaign</span>
                             <span v-if="currentNotice" class="notice-dot"></span>
@@ -382,10 +390,9 @@
                 </div>
                 <div style="border-top:1px solid #eee; padding-top:15px;">
                     <div style="display:flex; gap:10px;">
-                        <button class="btn-full" style="background:#e3f2fd; color:#1565c0; margin:0;" @click="uploadData" :disabled="loading">{{ loading?'...':'手动同步' }}</button>
-                        <button class="btn-full" style="background:#f3e5f5; color:#6a1b9a; margin:0;" @click="downloadData" :disabled="loading">{{ loading?'...':'强制刷新' }}</button>
+                        <button class="btn-full" style="background:#e3f2fd; color:#1565c0; margin:0;" @click="manualSync" :disabled="loading">{{ loading?'...':'手动同步' }}</button>
                     </div>
-                    <div style="font-size:12px; color:#999; text-align:center; margin-top:10px;">数据会自动保存，无需频繁点击同步</div>
+                    <div style="font-size:12px; color:#999; text-align:center; margin-top:10px;">系统会自动每8秒同步一次</div>
                     <button class="btn-full btn-red" @click="logout" style="margin-top:15px;">退出登录</button>
                 </div>
             </div>
@@ -524,7 +531,7 @@
 
     <script>
     const { createApp, ref, computed, nextTick, onMounted, onUnmounted, watch } = Vue;
-    // 配置信息 (请勿随意修改，否则无法连接到您的数据库)
+    // 配置信息
     const CONFIG = { 
         binId: '6923c68543b1c97be9c111de', 
         apiKey: '$2a$10$PzeIEyOc63K1OPPrCb1Y.uzvCUXWUEfsYmu.7gkaCMTsjJ3FLWM3u' 
@@ -542,7 +549,8 @@
             const records = ref({});
             const users = ref([]);
             const notices = ref({});
-            const lastCloudUpdate = ref(0); // 记录云端数据的最后更新时间
+            const lastCloudUpdate = ref(0); 
+            const lastSyncTime = ref(''); 
 
             // UI 状态
             const isLoggedIn = ref(false);
@@ -570,13 +578,13 @@
             // 工具与系统
             const scanning = ref(false);
             const printing = ref(false);
-            const loading = ref(false); // 全局加载状态
-            const syncing = ref(false); // 后台同步状态
+            const loading = ref(false); 
+            const syncing = ref(false); 
             const toast = ref({ show: false, msg: '', type: 'info' });
             const newStudent = ref({ classId:'', no:'', name:'' });
             let html5QrcodeScanner = null;
-            let syncInterval = null; // 定时器ID
-            let saveTimer = null;    // 防抖定时器
+            let syncInterval = null; 
+            let saveTimer = null;    
 
             // --- 计算属性 ---
             const allClassList = computed(() => [...new Set(roster.value.map(s => s.classId))].sort());
@@ -626,23 +634,26 @@
             const getRec = (uid) => {
                 let r = records.value[currentSubject.value][uid];
                 if(!r) return { submitted:false, imgs:[] };
-                if(r === true) return { submitted:true, imgs:[] }; // 兼容旧数据
+                if(r === true) return { submitted:true, imgs:[] }; 
                 if(r.img && (!r.imgs || r.imgs.length===0)) r.imgs = [r.img];
                 if(!r.imgs) r.imgs = [];
                 return r;
             };
 
             const setRec = (uid, data) => {
-                // 确保写入时间戳，用于合并冲突
-                data.ts = Date.now();
+                // [关键修复]：确保新的时间戳永远大于旧的时间戳
+                const oldRec = records.value[currentSubject.value][uid] || {};
+                const oldTs = oldRec.ts || 0;
+                // 新时间戳 = 当前时间，但如果当前时间比旧记录小（设备时间不准），则强制使用旧时间+1
+                data.ts = Math.max(Date.now(), oldTs + 1);
                 records.value[currentSubject.value][uid] = data;
             };
 
-            // --- 数据同步核心 (Auto Sync & Merge) ---
+            // --- 数据同步核心 ---
 
-            // 深度合并两个记录对象 (解决并发冲突)
+            // 深度合并
             const mergeRecords = (localRecs, cloudRecs) => {
-                const merged = { ...localRecs }; // 以本地为基准
+                const merged = { ...localRecs };
                 
                 for (const sub in cloudRecs) {
                     if (!merged[sub]) merged[sub] = {};
@@ -650,13 +661,12 @@
                         const cloudItem = cloudRecs[sub][uid];
                         const localItem = merged[sub][uid];
 
-                        // 如果本地没有，直接用云端的
                         if (!localItem) {
                             merged[sub][uid] = cloudItem;
                             continue;
                         }
 
-                        // 如果两边都有，比较时间戳 (ts)，谁大(新)用谁
+                        // [关键逻辑]：只有当云端时间戳 确实大于 本地时间戳时，才覆盖本地
                         const cloudTs = cloudItem.ts || 0;
                         const localTs = localItem.ts || 0;
                         
@@ -674,110 +684,122 @@
                 else syncing.value = true;
 
                 try {
-                    const res = await fetch(`https://api.jsonbin.io/v3/b/${CONFIG.binId}/latest`, { 
+                    // [关键] 添加随机参数 _t 强制不缓存
+                    const url = `https://api.jsonbin.io/v3/b/${CONFIG.binId}/latest?meta=false&_t=${Date.now()}`;
+                    
+                    const res = await fetch(url, { 
                         headers: { 'X-Master-Key': CONFIG.apiKey } 
                     });
                     if(!res.ok) throw new Error("同步失败");
                     
-                    const json = await res.json(); 
-                    const data = json.record || {};
+                    const data = await res.json(); 
                     const cloudUpdatedAt = data.updatedAt || 0;
 
-                    // 如果云端数据比本地记录的更新，则进行更新
-                    if (cloudUpdatedAt > lastCloudUpdate.value) {
-                        // 1. 同步名单和用户 (以云端为主)
-                        if(data.roster) roster.value = data.roster;
-                        if(data.users) users.value = data.users;
-                        if(data.notices) notices.value = data.notices;
+                    if(data.roster) roster.value = data.roster;
+                    if(data.users) users.value = data.users;
+                    if(data.notices) notices.value = data.notices;
 
-                        // 2. 智能合并记录 (防止正在操作时被云端旧数据覆盖)
-                        if(data.records) {
-                            records.value = mergeRecords(records.value, data.records);
-                        }
-
-                        lastCloudUpdate.value = cloudUpdatedAt;
-                        initStructure();
-                        
-                        // 更新当前用户信息权限
-                        if (isLoggedIn.value && currentUser.value) {
-                            const updatedUser = users.value.find(u => u.username === currentUser.value.username);
-                            if (updatedUser) currentUser.value = updatedUser;
-                        }
+                    if(data.records) {
+                        records.value = mergeRecords(records.value, data.records);
                     }
+
+                    lastCloudUpdate.value = cloudUpdatedAt;
+                    const now = new Date();
+                    lastSyncTime.value = `${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+                    
+                    initStructure();
+                    
+                    if (isLoggedIn.value && currentUser.value) {
+                        const updatedUser = users.value.find(u => u.username === currentUser.value.username);
+                        if (updatedUser) currentUser.value = updatedUser;
+                    }
+                    
                 } catch(e) { 
-                    if(!silent) showToast("网络连接差", "error"); 
+                    console.error(e);
+                    if(!silent) showToast("网络较差", "error"); 
                 } finally { 
                     if(!silent) loading.value = false; 
                     syncing.value = false;
                 }
             };
 
-            // 保存到云端 (先拉后推，Reduce Conflict)
+            // 保存到云端
             const performSave = async () => {
                 syncing.value = true;
                 try {
-                    // 1. 先获取最新云端数据
-                    const res = await fetch(`https://api.jsonbin.io/v3/b/${CONFIG.binId}/latest`, { 
+                    const res = await fetch(`https://api.jsonbin.io/v3/b/${CONFIG.binId}/latest?meta=false&_t=${Date.now()}`, { 
                         headers: { 'X-Master-Key': CONFIG.apiKey } 
                     });
-                    const json = await res.json();
-                    const cloudData = json.record || {};
+                    const cloudData = await res.json();
 
-                    // 2. 合并：将我们的修改 合并到 云端最新数据上
                     let finalRecords = records.value;
                     if (cloudData.records) {
                         finalRecords = mergeRecords(records.value, cloudData.records);
                     }
-                    // 确保本地也更新为合并后的结果
                     records.value = finalRecords;
 
-                    // 3. 准备上传包
                     const payload = {
                         updatedAt: Date.now(),
-                        roster: roster.value.length > (cloudData.roster?.length || 0) ? roster.value : (cloudData.roster || roster.value), // 简单的名单保护
+                        roster: roster.value.length > (cloudData.roster?.length || 0) ? roster.value : (cloudData.roster || roster.value),
                         records: finalRecords,
                         users: users.value,
                         notices: notices.value
                     };
 
-                    // 4. 上传
-                    await fetch(`https://api.jsonbin.io/v3/b/${CONFIG.binId}`, { 
+                    const putRes = await fetch(`https://api.jsonbin.io/v3/b/${CONFIG.binId}`, { 
                         method: 'PUT', 
                         headers: { 'Content-Type': 'application/json', 'X-Master-Key': CONFIG.apiKey }, 
                         body: JSON.stringify(payload) 
                     });
+                    
+                    if (putRes.status === 413) {
+                        throw new Error("图片过多，无法同步");
+                    }
+                    if (!putRes.ok) throw new Error("上传失败");
 
                     lastCloudUpdate.value = payload.updatedAt;
-                    // showToast("已自动同步", "success"); // 静默保存不需要弹窗打扰
+                    const now = new Date();
+                    lastSyncTime.value = `${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
 
                 } catch(e) {
                     console.error(e);
-                    showToast("同步失败，请检查网络", "error");
+                    if(e.message.includes("图片")) showToast(e.message, "error");
+                    else showToast("同步失败", "error");
                 } finally {
                     syncing.value = false;
                 }
             };
 
-            // 防抖保存：用户连续点击时，延迟 1.5秒 后再执行保存
             const debouncedSave = () => {
                 if (saveTimer) clearTimeout(saveTimer);
                 saveTimer = setTimeout(() => {
                     performSave();
                 }, 1500);
             };
+            
+            const manualSync = async () => {
+                await fetchCloudData();
+                showToast("已获取最新数据", "success");
+            }
 
             // --- 业务操作 ---
 
             const toggleStatus = (s) => {
                 const rec = getRec(s.uid);
                 if (rec.submitted) {
-                    if(rec.imgs.length > 0 && confirm("该学生有照片，取消将不删除照片仅标记为未交？")) setRec(s.uid, { ...rec, submitted: false });
-                    else if(rec.imgs.length === 0) delete records.value[currentSubject.value][s.uid];
+                    if(rec.imgs.length > 0 && confirm("该学生有照片，取消将不删除照片仅标记为未交？")) {
+                         // 取消上交，保留照片，explicit submitted: false
+                        setRec(s.uid, { ...rec, submitted: false });
+                    }
+                    else if(rec.imgs.length === 0) {
+                        // [关键修复]：以前是 delete，现在改为明确设置为 false
+                        // 这样云端合并时，才知道你是故意取消的，而不是“本地数据丢了”
+                        setRec(s.uid, { ...rec, submitted: false });
+                    }
                 } else {
-                    setRec(s.uid, { ...rec, submitted: true }); // setRec 内部已加 ts
+                    setRec(s.uid, { ...rec, submitted: true });
                     if(navigator.vibrate) navigator.vibrate(50);
                 }
-                // 触发自动保存
                 debouncedSave();
             };
 
@@ -787,7 +809,7 @@
                 notices.value[currentClass.value][currentSubject.value] = tempNoticeText.value;
                 showToast("公告更新", "success"); 
                 showNoticeModal.value = false;
-                debouncedSave(); // 自动保存
+                debouncedSave(); 
             };
             const clearNotice = () => { tempNoticeText.value = ''; saveNotice(); };
 
@@ -805,38 +827,59 @@
             };
             const closeCamera = () => { if(videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; } cameraActive.value = false; currentPhotoStudent.value = null; };
             const triggerSystemCamera = () => { document.getElementById('system-camera-input').click(); };
+            
+            // [关键修复] 图片压缩逻辑，减小体积以便上传
+            const compressImage = (imgSrc, callback) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas'); 
+                    // 强制缩小到 600px 以内
+                    const maxDim = 600; 
+                    let w = img.width, h = img.height;
+                    if(w>h && w>maxDim){ h*=maxDim/w; w=maxDim; } else if(h>maxDim){ w*=maxDim/h; h=maxDim; }
+                    canvas.width = w; canvas.height = h; 
+                    const ctx = canvas.getContext('2d'); 
+                    ctx.drawImage(img, 0, 0, w, h);
+                    // 质量压缩到 0.5
+                    callback(canvas.toDataURL('image/jpeg', 0.5));
+                };
+                img.src = imgSrc;
+            }
+
             const handleSystemCamera = (e) => {
                 const file = e.target.files[0]; if(!file) return;
                 if(tempImages.value.length >= 10) return showToast("最多10张", "error");
                 const reader = new FileReader();
-                reader.onload = (e) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas'); const maxDim = 800; let w = img.width, h = img.height;
-                        if(w>h && w>maxDim){ h*=maxDim/w; w=maxDim; } else if(h>maxDim){ w*=maxDim/h; h=maxDim; }
-                        canvas.width = w; canvas.height = h; const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, w, h);
-                        tempImages.value.push(canvas.toDataURL('image/jpeg', 0.6));
-                    };
-                    img.src = e.target.result;
+                reader.onload = (evt) => {
+                    compressImage(evt.target.result, (compressed) => {
+                        tempImages.value.push(compressed);
+                    });
                 };
                 reader.readAsDataURL(file); e.target.value = '';
             };
+
             const takePhoto = () => {
                 if(cameraError.value) return showToast("请使用系统相机按钮", "error");
                 if(tempImages.value.length >= 10) return showToast("最多10张", "error");
                 const video = document.getElementById('camera-feed'); const canvas = document.getElementById('photo-canvas');
                 if(!video || !canvas) return;
-                const maxDim = 800; let w = video.videoWidth, h = video.videoHeight;
-                if(w>h && w>maxDim){ h*=maxDim/w; w=maxDim; } else if(h>maxDim){ w*=maxDim/h; h=maxDim; }
-                canvas.width = w; canvas.height = h; const ctx = canvas.getContext('2d'); ctx.drawImage(video, 0, 0, w, h);
-                tempImages.value.push(canvas.toDataURL('image/jpeg', 0.6));
-                if(navigator.vibrate) navigator.vibrate(50);
+                
+                // 截图
+                canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d'); ctx.drawImage(video, 0, 0);
+                
+                // 压缩
+                compressImage(canvas.toDataURL('image/jpeg', 1.0), (compressed) => {
+                    tempImages.value.push(compressed);
+                    if(navigator.vibrate) navigator.vibrate(50);
+                });
             };
+
             const saveAndCloseCamera = () => { 
                 if(currentPhotoStudent.value) { 
                     setRec(currentPhotoStudent.value.uid, { submitted: true, imgs: tempImages.value }); 
                     showToast("保存成功", "success"); 
-                    debouncedSave(); // 自动保存
+                    debouncedSave(); 
                 } 
                 closeCamera(); 
             };
@@ -848,7 +891,7 @@
                     const s = currentPhotoStudent.value; 
                     setRec(s.uid, { submitted: true, imgs: tempImages.value }); 
                     if(tempImages.value.length === 0) previewImageModal.value = false;
-                    debouncedSave(); // 自动保存
+                    debouncedSave(); 
                 } 
             };
             const deleteAllImages = () => { 
@@ -856,7 +899,7 @@
                     tempImages.value = []; 
                     setRec(currentPhotoStudent.value.uid, { submitted: true, imgs: [] }); 
                     previewImageModal.value = false;
-                    debouncedSave(); // 自动保存
+                    debouncedSave(); 
                 } 
             };
 
@@ -868,28 +911,26 @@
                 roster.value.push({ classId: String(classId).trim(), no: String(no).trim().padStart(2,'0'), name: name.trim(), uid: newUid });
                 if(!currentUser.value.classes.includes(classId)) { currentUser.value.classes.push(classId); users.value = users.value.map(u => u.username === currentUser.value.username ? currentUser.value : u); }
                 newStudent.value = { classId:'', no:'', name:'' }; showToast("添加成功", "success"); if(!currentClass.value) currentClass.value = classId;
-                debouncedSave(); // 自动保存
+                debouncedSave(); 
             };
 
             const handleAuth = async () => {
                 if(!authForm.value.username || !authForm.value.password) return showToast("请输入账号密码", "error");
                 authLoading.value = true;
                 try {
-                    await fetchCloudData(true); // 登录前强制拉取一次
+                    await fetchCloudData(true); 
                     const { username, password, selectedClasses } = authForm.value;
                     const user = users.value.find(u => u.username === username);
                     if (isRegistering.value) {
                         if (user) throw new Error("用户名已存在");
                         const newUser = { username, password, classes: selectedClasses }; users.value.push(newUser);
-                        await performSave(); // 注册立即保存
+                        await performSave(); 
                         currentUser.value = newUser; isLoggedIn.value = true;
                     } else {
                         if (!user || user.password !== password) throw new Error("账号或密码错误");
                         currentUser.value = user; isLoggedIn.value = true;
                     }
                     if (allowedClassList.value.length > 0) currentClass.value = allowedClassList.value[0];
-                    
-                    // 登录成功后启动自动同步
                     startAutoSync();
 
                 } catch (e) { showToast(e.message, "error"); } finally { authLoading.value = false; }
@@ -898,11 +939,10 @@
             const toggleAuthMode = () => { isRegistering.value = !isRegistering.value; authForm.value.selectedClasses = []; };
             const logout = () => { 
                 isLoggedIn.value = false; currentUser.value = null; showMenu.value = false; 
-                if(syncInterval) clearInterval(syncInterval); // 登出停止同步
+                if(syncInterval) clearInterval(syncInterval); 
                 showToast("已退出"); 
             };
             
-            // 手动触发
             const uploadData = async () => { await performSave(); showToast("上传成功", "success"); };
             const downloadData = async () => { await fetchCloudData(); showToast("已是最新", "success"); };
             
@@ -916,7 +956,6 @@
                 } 
             };
 
-            // 文件导入导出
             const triggerFileUpload = () => { document.getElementById('file-upload').click(); };
             const handleFileUpload = (e) => {
                 const file = e.target.files[0]; if (!file) return;
@@ -930,7 +969,7 @@
                             roster.value = [...roster.value, ...newRoster.filter(s=>!exist.has(s.uid))]; 
                             showToast("导入成功", "success"); 
                             if(currentUser.value.classes.length === 0) { showUserSetting.value = true; showToast("请勾选您的班级", "info"); }
-                            debouncedSave(); // 自动保存
+                            debouncedSave(); 
                         }
                     } catch (err) { showToast("解析失败", "error"); } e.target.value = ''; showMenu.value = false;
                 }; reader.readAsArrayBuffer(file);
@@ -941,7 +980,7 @@
                     subjects.forEach(sub => { if(records.value[sub]) Object.keys(records.value[sub]).forEach(uid => { if(uid.startsWith(c+'-')) delete records.value[sub][uid]; }); }); 
                     if(currentClass.value===c) currentClass.value = allowedClassList.value[0]||''; 
                     showToast("已删除", "success"); 
-                    debouncedSave(); // 自动保存
+                    debouncedSave(); 
                 } 
             };
             const exportExcel = () => {
@@ -950,14 +989,30 @@
                 const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), currentSubject.value);
                 XLSX.writeFile(wb, `${currentClass.value}班_${currentSubject.value}_统计.xlsx`); showMenu.value=false;
             };
+
+            // [关键修复] 重置逻辑升级：显式覆盖为 false
             const resetCurrentSubject = () => { 
-                if(confirm("重置当前科目记录？")) { 
-                    records.value[currentSubject.value]={}; 
-                    showToast("已重置"); 
-                    showMenu.value=false; 
-                    debouncedSave(); // 自动保存
+                if(confirm(`确定重置【${currentClass.value}班 ${currentSubject.value}】的所有记录？\n这将会清除所有照片和已交状态。`)) {
+                    const now = Date.now();
+                    const subj = currentSubject.value;
+                    
+                    if (!records.value[subj]) records.value[subj] = {};
+
+                    // 显式地将当前班级学生的记录改为 unsubmitted，并更新时间戳
+                    currentList.value.forEach(student => {
+                        records.value[subj][student.uid] = {
+                            submitted: false,
+                            imgs: [],
+                            ts: now // 关键：必须比云端新
+                        };
+                    });
+
+                    showToast("已重置", "success"); 
+                    showMenu.value = false; 
+                    debouncedSave(); // 立即触发同步
                 } 
             };
+
             const preparePrint = async () => { showMenu.value = false; if(currentList.value.length === 0) return showToast("无数据"); printing.value = true; await nextTick(); document.querySelectorAll('.qr-img-container').forEach(e => e.innerHTML=''); currentList.value.forEach(s => { const el = document.getElementById('qrcode-' + s.uid); if(el) new QRCode(el, { text: s.uid, width: 120, height: 120 }); }); setTimeout(() => { window.print(); setTimeout(() => printing.value = false, 1000); }, 500); };
 
             const startScan = () => {
@@ -970,25 +1025,24 @@
                             setRec(txt, { ...getRec(txt), submitted: true });
                             if (navigator.vibrate) try { navigator.vibrate(200); } catch(e){}
                             showToast(`${s.name} OK`, "success");
-                            debouncedSave(); // 扫码后自动保存
+                            debouncedSave(); 
                         }
                     });
                 });
             };
             const stopScan = () => { if(html5QrcodeScanner) html5QrcodeScanner.stop().then(()=>{html5QrcodeScanner.clear();scanning.value=false;}); else scanning.value=false; };
 
-            // 启动定时同步 (每5秒拉取一次)
             const startAutoSync = () => {
                 if(syncInterval) clearInterval(syncInterval);
                 syncInterval = setInterval(() => {
                     if(!loading.value && !printing.value && !scanning.value) {
-                        fetchCloudData(true); // true = 静默模式
+                        fetchCloudData(true); 
                     }
-                }, 5000); // 5秒轮询
+                }, 8000); 
             };
 
             onMounted(() => {
-                fetchCloudData(); // 首次加载
+                fetchCloudData(); 
             });
             
             onUnmounted(() => {
@@ -998,8 +1052,8 @@
             return {
                 subjects, currentSubject, currentClass, allowedClassList, allClassList, currentList, percentage, submittedCount,
                 isLoggedIn, currentUser, isRegistering, authForm, authLoading, showMenu, showClassManager, showUserSetting, showWeChatTip, showNoticeModal, tempNoticeText, currentNotice,
-                scanning, printing, loading, syncing, toast, newStudent, cameraActive, cameraError, previewImageModal, singleBigImg, currentPhotoStudent, tempImages,
-                handleAuth, toggleAuthMode, logout, updateUserClasses, toggleStatus, openNoticeModal, saveNotice, clearNotice, openCamera, closeCamera, triggerSystemCamera, handleSystemCamera, takePhoto, saveAndCloseCamera, viewImages, viewSingleBig, deleteImage, deleteAllImages, addManualStudent, deleteClass, triggerFileUpload, handleFileUpload, exportExcel, resetCurrentSubject, uploadData, downloadData, preparePrint, startScan, stopScan
+                scanning, printing, loading, syncing, toast, newStudent, cameraActive, cameraError, previewImageModal, singleBigImg, currentPhotoStudent, tempImages, lastSyncTime,
+                handleAuth, toggleAuthMode, logout, updateUserClasses, toggleStatus, openNoticeModal, saveNotice, clearNotice, openCamera, closeCamera, triggerSystemCamera, handleSystemCamera, takePhoto, saveAndCloseCamera, viewImages, viewSingleBig, deleteImage, deleteAllImages, addManualStudent, deleteClass, triggerFileUpload, handleFileUpload, exportExcel, resetCurrentSubject, uploadData, downloadData, manualSync, preparePrint, startScan, stopScan
             };
         }
     }).mount('#app');
