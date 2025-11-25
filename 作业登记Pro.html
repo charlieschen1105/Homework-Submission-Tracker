@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Homework Tracker Pro </title>
+    <title>全科作业登记 </title>
     <!-- 核心库 -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
@@ -36,11 +36,18 @@
         /* --- 动画 --- */
         @keyframes spin { 100% { transform: rotate(360deg); } }
         .icon-spin { display: inline-block; animation: spin 1s linear infinite; }
+        
+        /* 进度条动画 */
+        .upload-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 3000;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; color: white;
+        }
+        .spinner { width: 40px; height: 40px; border: 4px solid #fff; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px; }
 
         /* --- 打印优化 --- */
         #print-area { display: none; }
         @media print {
-            .header-section, .fab-container, .modal-overlay, .main-content, .toast, .wechat-tip-overlay { display: none !important; }
+            .header-section, .fab-container, .modal-overlay, .main-content, .toast, .wechat-tip-overlay, .upload-overlay { display: none !important; }
             #print-area { display: block; padding: 10px; font-family: sans-serif; }
             .print-title { text-align: center; margin-bottom: 20px; font-size: 24px; }
             .qr-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; }
@@ -241,10 +248,16 @@
 </head>
 <body :class="{'print-mode': printing}">
     <div id="app">
-        <!-- 系统相机兜底 Input -->
         <input type="file" id="system-camera-input" accept="image/*" capture="environment" style="display:none" @change="handleSystemCamera" />
         <input type="file" id="file-upload" accept=".xlsx, .xls" @change="handleFileUpload" style="display:none" />
         
+        <!-- 上传中遮罩 -->
+        <div v-if="uploadingImg" class="upload-overlay">
+            <div class="spinner"></div>
+            <div>图片上传图床中...</div>
+            <div style="font-size:12px; margin-top:5px; opacity:0.8;">请耐心等待，成功后会自动保存</div>
+        </div>
+
         <!-- 微信导出提示 -->
         <div v-if="showWeChatTip" class="wechat-tip-overlay" @click="showWeChatTip=false">
             <span class="material-icons-round" style="font-size:48px; display:block; margin-bottom:10px;">arrow_upward</span>
@@ -331,7 +344,6 @@
 
                 <div class="student-grid" v-else>
                     <div v-for="s in currentList" :key="s.uid" class="student-card" :class="{done: s.submitted}">
-                        <!-- 左侧：点击切换状态 -->
                         <div class="student-left" @click="toggleStatus(s)">
                             <div class="student-avatar">{{ s.no }}</div>
                             <div class="student-info">
@@ -339,8 +351,6 @@
                                 <div class="student-id">{{ s.classId }}班 {{ s.no }}号</div>
                             </div>
                         </div>
-
-                        <!-- 右侧：操作区 -->
                         <div class="action-area">
                             <div v-if="s.imgCount > 0" class="btn-camera" style="color:var(--primary); background:#e3f2fd;" @click.stop="viewImages(s)">
                                 <span class="material-icons-round">photo_library</span> {{ s.imgCount }}
@@ -367,7 +377,18 @@
         <!-- 菜单 -->
         <div class="modal-overlay" v-if="showMenu" @click.self="showMenu = false">
             <div class="modal-sheet">
-                <div style="font-size:18px; font-weight:700; margin-bottom:20px;">系统菜单</div>
+                <div style="font-size:18px; font-weight:700; margin-bottom:10px;">系统菜单</div>
+                <div style="background:#fff3cd; color:#856404; padding:8px; font-size:12px; border-radius:6px; margin-bottom:15px;">
+                    无限空间模式：照片将上传至 ImgBB 图床，数据库仅保存链接，不再受容量限制。
+                </div>
+                
+                <!-- API KEY 设置区域 -->
+                <div style="background:#f8f9fa; padding:10px; border-radius:8px; margin-bottom:15px;">
+                    <div style="font-size:12px; font-weight:bold; margin-bottom:5px;">ImgBB API Key (图床密钥)</div>
+                    <input v-model="imgbbKey" placeholder="默认使用内置测试Key (建议更换)" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:4px; font-size:12px;">
+                    <div style="font-size:10px; color:#666; margin-top:4px;">请前往 api.imgbb.com 免费申请</div>
+                </div>
+
                 <div class="menu-grid">
                     <div class="menu-item" @click="triggerFileUpload">
                         <span class="material-icons-round" style="color:#4caf50; font-size:24px;">upload_file</span><span>Excel导入</span>
@@ -392,7 +413,6 @@
                     <div style="display:flex; gap:10px;">
                         <button class="btn-full" style="background:#e3f2fd; color:#1565c0; margin:0;" @click="manualSync" :disabled="loading">{{ loading?'...':'手动同步' }}</button>
                     </div>
-                    <div style="font-size:12px; color:#999; text-align:center; margin-top:10px;">系统会自动每8秒同步一次</div>
                     <button class="btn-full btn-red" @click="logout" style="margin-top:15px;">退出登录</button>
                 </div>
             </div>
@@ -440,7 +460,7 @@
                         <div class="shutter-inner"></div>
                     </div>
                     <button class="btn-system-cam" style="background:#00c853; border-color:#00c853;" @click="saveAndCloseCamera">
-                        <span class="material-icons-round">check</span> 完成
+                        <span class="material-icons-round">check</span> 提交(上传)
                     </button>
                 </div>
             </div>
@@ -551,6 +571,9 @@
             const notices = ref({});
             const lastCloudUpdate = ref(0); 
             const lastSyncTime = ref(''); 
+            
+            // 图床配置 - 默认使用一个临时测试Key，建议用户更换
+            const imgbbKey = ref('2ca05c07e234580b71ff4a1ba12adf8f'); 
 
             // UI 状态
             const isLoggedIn = ref(false);
@@ -570,9 +593,11 @@
             const cameraActive = ref(false);
             const cameraError = ref(false);
             const currentPhotoStudent = ref(null);
-            const tempImages = ref([]);
+            const tempImages = ref([]); // 这里可能存Base64也可能存URL
             const previewImageModal = ref(false);
             const singleBigImg = ref(null);
+            const uploadinImg = ref(false); // 上传中状态
+            const uploadingImg = ref(false);
             let videoStream = null;
 
             // 工具与系统
@@ -641,81 +666,79 @@
             };
 
             const setRec = (uid, data) => {
-                // [关键修复]：确保新的时间戳永远大于旧的时间戳
                 const oldRec = records.value[currentSubject.value][uid] || {};
                 const oldTs = oldRec.ts || 0;
-                // 新时间戳 = 当前时间，但如果当前时间比旧记录小（设备时间不准），则强制使用旧时间+1
                 data.ts = Math.max(Date.now(), oldTs + 1);
                 records.value[currentSubject.value][uid] = data;
             };
 
-            // --- 数据同步核心 ---
+            // --- 图床上传核心逻辑 ---
+            const uploadToImgBB = async (base64Str) => {
+                // 移除Base64头 (data:image/jpeg;base64,)
+                const cleanBase64 = base64Str.replace(/^data:image\/(png|jpg|jpeg);base64,/, "");
+                
+                const formData = new FormData();
+                formData.append("image", cleanBase64);
+                
+                try {
+                    const res = await fetch(`https://api.imgbb.com/1/upload?key=${imgbbKey.value}`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await res.json();
+                    if(data.success) {
+                        return data.data.url; // 返回图片URL
+                    } else {
+                        throw new Error(data.error?.message || "上传失败");
+                    }
+                } catch(e) {
+                    console.error("ImgBB Upload Error:", e);
+                    throw e; // 抛出错误以便降级处理
+                }
+            };
 
-            // 深度合并
+            // --- 数据同步核心 ---
             const mergeRecords = (localRecs, cloudRecs) => {
                 const merged = { ...localRecs };
-                
                 for (const sub in cloudRecs) {
                     if (!merged[sub]) merged[sub] = {};
                     for (const uid in cloudRecs[sub]) {
                         const cloudItem = cloudRecs[sub][uid];
                         const localItem = merged[sub][uid];
-
                         if (!localItem) {
                             merged[sub][uid] = cloudItem;
                             continue;
                         }
-
-                        // [关键逻辑]：只有当云端时间戳 确实大于 本地时间戳时，才覆盖本地
                         const cloudTs = cloudItem.ts || 0;
                         const localTs = localItem.ts || 0;
-                        
-                        if (cloudTs > localTs) {
-                            merged[sub][uid] = cloudItem;
-                        }
+                        if (cloudTs > localTs) merged[sub][uid] = cloudItem;
                     }
                 }
                 return merged;
             };
 
-            // 拉取云端数据
             const fetchCloudData = async (silent = false) => {
                 if(!silent) loading.value = true;
                 else syncing.value = true;
-
                 try {
-                    // [关键] 添加随机参数 _t 强制不缓存
                     const url = `https://api.jsonbin.io/v3/b/${CONFIG.binId}/latest?meta=false&_t=${Date.now()}`;
-                    
-                    const res = await fetch(url, { 
-                        headers: { 'X-Master-Key': CONFIG.apiKey } 
-                    });
+                    const res = await fetch(url, { headers: { 'X-Master-Key': CONFIG.apiKey } });
                     if(!res.ok) throw new Error("同步失败");
-                    
                     const data = await res.json(); 
                     const cloudUpdatedAt = data.updatedAt || 0;
-
                     if(data.roster) roster.value = data.roster;
                     if(data.users) users.value = data.users;
                     if(data.notices) notices.value = data.notices;
-
-                    if(data.records) {
-                        records.value = mergeRecords(records.value, data.records);
-                    }
-
+                    if(data.records) records.value = mergeRecords(records.value, data.records);
                     lastCloudUpdate.value = cloudUpdatedAt;
                     const now = new Date();
                     lastSyncTime.value = `${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
-                    
                     initStructure();
-                    
                     if (isLoggedIn.value && currentUser.value) {
                         const updatedUser = users.value.find(u => u.username === currentUser.value.username);
                         if (updatedUser) currentUser.value = updatedUser;
                     }
-                    
                 } catch(e) { 
-                    console.error(e);
                     if(!silent) showToast("网络较差", "error"); 
                 } finally { 
                     if(!silent) loading.value = false; 
@@ -723,7 +746,6 @@
                 }
             };
 
-            // 保存到云端
             const performSave = async () => {
                 syncing.value = true;
                 try {
@@ -731,13 +753,9 @@
                         headers: { 'X-Master-Key': CONFIG.apiKey } 
                     });
                     const cloudData = await res.json();
-
                     let finalRecords = records.value;
-                    if (cloudData.records) {
-                        finalRecords = mergeRecords(records.value, cloudData.records);
-                    }
+                    if (cloudData.records) finalRecords = mergeRecords(records.value, cloudData.records);
                     records.value = finalRecords;
-
                     const payload = {
                         updatedAt: Date.now(),
                         roster: roster.value.length > (cloudData.roster?.length || 0) ? roster.value : (cloudData.roster || roster.value),
@@ -745,26 +763,16 @@
                         users: users.value,
                         notices: notices.value
                     };
-
-                    const putRes = await fetch(`https://api.jsonbin.io/v3/b/${CONFIG.binId}`, { 
+                    await fetch(`https://api.jsonbin.io/v3/b/${CONFIG.binId}`, { 
                         method: 'PUT', 
                         headers: { 'Content-Type': 'application/json', 'X-Master-Key': CONFIG.apiKey }, 
                         body: JSON.stringify(payload) 
                     });
-                    
-                    if (putRes.status === 413) {
-                        throw new Error("图片过多，无法同步");
-                    }
-                    if (!putRes.ok) throw new Error("上传失败");
-
                     lastCloudUpdate.value = payload.updatedAt;
                     const now = new Date();
                     lastSyncTime.value = `${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
-
                 } catch(e) {
-                    console.error(e);
-                    if(e.message.includes("图片")) showToast(e.message, "error");
-                    else showToast("同步失败", "error");
+                    showToast("同步失败", "error");
                 } finally {
                     syncing.value = false;
                 }
@@ -772,28 +780,18 @@
 
             const debouncedSave = () => {
                 if (saveTimer) clearTimeout(saveTimer);
-                saveTimer = setTimeout(() => {
-                    performSave();
-                }, 1500);
+                saveTimer = setTimeout(() => { performSave(); }, 1500);
             };
             
-            const manualSync = async () => {
-                await fetchCloudData();
-                showToast("已获取最新数据", "success");
-            }
-
-            // --- 业务操作 ---
+            const manualSync = async () => { await fetchCloudData(); showToast("已获取最新数据", "success"); }
 
             const toggleStatus = (s) => {
                 const rec = getRec(s.uid);
                 if (rec.submitted) {
                     if(rec.imgs.length > 0 && confirm("该学生有照片，取消将不删除照片仅标记为未交？")) {
-                         // 取消上交，保留照片，explicit submitted: false
                         setRec(s.uid, { ...rec, submitted: false });
                     }
                     else if(rec.imgs.length === 0) {
-                        // [关键修复]：以前是 delete，现在改为明确设置为 false
-                        // 这样云端合并时，才知道你是故意取消的，而不是“本地数据丢了”
                         setRec(s.uid, { ...rec, submitted: false });
                     }
                 } else {
@@ -828,20 +826,17 @@
             const closeCamera = () => { if(videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; } cameraActive.value = false; currentPhotoStudent.value = null; };
             const triggerSystemCamera = () => { document.getElementById('system-camera-input').click(); };
             
-            // [关键修复] 图片压缩逻辑，减小体积以便上传
             const compressImage = (imgSrc, callback) => {
                 const img = new Image();
                 img.onload = () => {
                     const canvas = document.createElement('canvas'); 
-                    // 强制缩小到 600px 以内
-                    const maxDim = 600; 
+                    const maxDim = 800; 
                     let w = img.width, h = img.height;
                     if(w>h && w>maxDim){ h*=maxDim/w; w=maxDim; } else if(h>maxDim){ w*=maxDim/h; h=maxDim; }
                     canvas.width = w; canvas.height = h; 
                     const ctx = canvas.getContext('2d'); 
                     ctx.drawImage(img, 0, 0, w, h);
-                    // 质量压缩到 0.5
-                    callback(canvas.toDataURL('image/jpeg', 0.5));
+                    callback(canvas.toDataURL('image/jpeg', 0.6));
                 };
                 img.src = imgSrc;
             }
@@ -863,22 +858,39 @@
                 if(tempImages.value.length >= 10) return showToast("最多10张", "error");
                 const video = document.getElementById('camera-feed'); const canvas = document.getElementById('photo-canvas');
                 if(!video || !canvas) return;
-                
-                // 截图
                 canvas.width = video.videoWidth; canvas.height = video.videoHeight;
                 const ctx = canvas.getContext('2d'); ctx.drawImage(video, 0, 0);
-                
-                // 压缩
                 compressImage(canvas.toDataURL('image/jpeg', 1.0), (compressed) => {
                     tempImages.value.push(compressed);
                     if(navigator.vibrate) navigator.vibrate(50);
                 });
             };
 
-            const saveAndCloseCamera = () => { 
+            // [关键] 保存并上传图片
+            const saveAndCloseCamera = async () => { 
                 if(currentPhotoStudent.value) { 
-                    setRec(currentPhotoStudent.value.uid, { submitted: true, imgs: tempImages.value }); 
+                    uploadingImg.value = true;
+                    // 1. 检查是否有需要上传的Base64图片
+                    const finalImages = [];
+                    for(let img of tempImages.value) {
+                        if(img.startsWith('data:image')) {
+                            try {
+                                const url = await uploadToImgBB(img);
+                                finalImages.push(url);
+                            } catch(e) {
+                                // 上传失败降级为Base64，并提示
+                                finalImages.push(img);
+                                showToast("图床上传失败，使用本地存储", "warning");
+                            }
+                        } else {
+                            finalImages.push(img); // 已经是URL
+                        }
+                    }
+
+                    // 2. 保存记录
+                    setRec(currentPhotoStudent.value.uid, { submitted: true, imgs: finalImages }); 
                     showToast("保存成功", "success"); 
+                    uploadingImg.value = false;
                     debouncedSave(); 
                 } 
                 closeCamera(); 
@@ -903,7 +915,6 @@
                 } 
             };
 
-            // --- 班级/用户管理 ---
             const addManualStudent = () => {
                 const { classId, no, name } = newStudent.value; if(!classId || !no || !name) return showToast("请填写完整", "error");
                 const newUid = `${String(classId).trim()}-${String(no).trim().padStart(2,'0')}`;
@@ -932,25 +943,18 @@
                     }
                     if (allowedClassList.value.length > 0) currentClass.value = allowedClassList.value[0];
                     startAutoSync();
-
                 } catch (e) { showToast(e.message, "error"); } finally { authLoading.value = false; }
             };
             
             const toggleAuthMode = () => { isRegistering.value = !isRegistering.value; authForm.value.selectedClasses = []; };
-            const logout = () => { 
-                isLoggedIn.value = false; currentUser.value = null; showMenu.value = false; 
-                if(syncInterval) clearInterval(syncInterval); 
-                showToast("已退出"); 
-            };
-            
+            const logout = () => { isLoggedIn.value = false; currentUser.value = null; showMenu.value = false; if(syncInterval) clearInterval(syncInterval); showToast("已退出"); };
             const uploadData = async () => { await performSave(); showToast("上传成功", "success"); };
             const downloadData = async () => { await fetchCloudData(); showToast("已是最新", "success"); };
             
             const updateUserClasses = async () => { 
                 const idx = users.value.findIndex(u => u.username === currentUser.value.username); 
                 if (idx !== -1) { 
-                    users.value[idx].classes = currentUser.value.classes; 
-                    await performSave(); 
+                    users.value[idx].classes = currentUser.value.classes; await performSave(); 
                     showToast("已保存", "success"); showUserSetting.value = false; 
                     if (!allowedClassList.value.includes(currentClass.value)) currentClass.value = allowedClassList.value[0] || ''; 
                 } 
@@ -989,30 +993,19 @@
                 const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), currentSubject.value);
                 XLSX.writeFile(wb, `${currentClass.value}班_${currentSubject.value}_统计.xlsx`); showMenu.value=false;
             };
-
-            // [关键修复] 重置逻辑升级：显式覆盖为 false
             const resetCurrentSubject = () => { 
                 if(confirm(`确定重置【${currentClass.value}班 ${currentSubject.value}】的所有记录？\n这将会清除所有照片和已交状态。`)) {
                     const now = Date.now();
                     const subj = currentSubject.value;
-                    
                     if (!records.value[subj]) records.value[subj] = {};
-
-                    // 显式地将当前班级学生的记录改为 unsubmitted，并更新时间戳
                     currentList.value.forEach(student => {
-                        records.value[subj][student.uid] = {
-                            submitted: false,
-                            imgs: [],
-                            ts: now // 关键：必须比云端新
-                        };
+                        records.value[subj][student.uid] = { submitted: false, imgs: [], ts: now };
                     });
-
                     showToast("已重置", "success"); 
                     showMenu.value = false; 
-                    debouncedSave(); // 立即触发同步
+                    debouncedSave(); 
                 } 
             };
-
             const preparePrint = async () => { showMenu.value = false; if(currentList.value.length === 0) return showToast("无数据"); printing.value = true; await nextTick(); document.querySelectorAll('.qr-img-container').forEach(e => e.innerHTML=''); currentList.value.forEach(s => { const el = document.getElementById('qrcode-' + s.uid); if(el) new QRCode(el, { text: s.uid, width: 120, height: 120 }); }); setTimeout(() => { window.print(); setTimeout(() => printing.value = false, 1000); }, 500); };
 
             const startScan = () => {
@@ -1052,7 +1045,7 @@
             return {
                 subjects, currentSubject, currentClass, allowedClassList, allClassList, currentList, percentage, submittedCount,
                 isLoggedIn, currentUser, isRegistering, authForm, authLoading, showMenu, showClassManager, showUserSetting, showWeChatTip, showNoticeModal, tempNoticeText, currentNotice,
-                scanning, printing, loading, syncing, toast, newStudent, cameraActive, cameraError, previewImageModal, singleBigImg, currentPhotoStudent, tempImages, lastSyncTime,
+                scanning, printing, loading, syncing, toast, newStudent, cameraActive, cameraError, previewImageModal, singleBigImg, currentPhotoStudent, tempImages, lastSyncTime, imgbbKey, uploadingImg,
                 handleAuth, toggleAuthMode, logout, updateUserClasses, toggleStatus, openNoticeModal, saveNotice, clearNotice, openCamera, closeCamera, triggerSystemCamera, handleSystemCamera, takePhoto, saveAndCloseCamera, viewImages, viewSingleBig, deleteImage, deleteAllImages, addManualStudent, deleteClass, triggerFileUpload, handleFileUpload, exportExcel, resetCurrentSubject, uploadData, downloadData, manualSync, preparePrint, startScan, stopScan
             };
         }
